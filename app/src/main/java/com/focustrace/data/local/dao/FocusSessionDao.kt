@@ -11,6 +11,9 @@ interface FocusSessionDao {
     @Transaction
     @Query("SELECT * FROM focus_sessions WHERE id = :id")
     fun observeReport(id: Long): Flow<com.focustrace.data.local.entity.SessionWithDistractions?>
+    @Transaction
+    @Query("SELECT * FROM focus_sessions WHERE startTime >= :start AND startTime < :end AND endTime IS NOT NULL AND status IN (3, 4) ORDER BY startTime, id")
+    fun observeStatistics(start: Long, end: Long): Flow<List<com.focustrace.data.local.entity.StatisticsRecord>>
     @Insert suspend fun insert(value: FocusSessionEntity): Long
     @Update suspend fun update(value: FocusSessionEntity)
     @Delete suspend fun delete(value: FocusSessionEntity)

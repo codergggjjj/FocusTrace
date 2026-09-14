@@ -34,6 +34,23 @@ class FoundationTest {
         compose.onNodeWithText("把注意力留给重要的事").assertIsDisplayed()
     }
 
+    @Test fun statisticsPeriodsAndHistorySurviveRecreation() {
+        compose.onAllNodesWithText("统计").onFirst().performClick()
+        compose.onNodeWithText("本月").performClick()
+        compose.onNodeWithText("下一月").assertIsNotEnabled()
+        compose.onNodeWithText("上一月").performClick()
+        val start = java.time.LocalDate.now().withDayOfMonth(1).minusMonths(1)
+        val label = "$start 至 ${start.plusMonths(1).minusDays(1)}"
+        compose.waitUntil(5000) { compose.onAllNodesWithText(label).fetchSemanticsNodes().isNotEmpty() }
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithText(label).assertIsDisplayed()
+        compose.onNodeWithText("下一月").assertIsEnabled()
+        compose.onNodeWithText("回到本月").performClick()
+        compose.onNodeWithText("下一月").assertIsNotEnabled()
+        compose.onNodeWithText("本周").performClick()
+        compose.onNodeWithText("上一周").assertIsDisplayed()
+    }
+
     @Test fun taskCrudPersistsAndValidatesInput() {
         compose.onNodeWithText("创建待办").performClick()
         compose.onNodeWithText("保存").assertIsNotEnabled()
