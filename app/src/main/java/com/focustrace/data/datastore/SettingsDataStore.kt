@@ -32,6 +32,10 @@ class SettingsDataStore(context: Context) {
             p[Keys.autoBreak] ?: true, p[Keys.autoFocus] ?: false, p[Keys.sound] ?: true,
             ThemeMode.entries.firstOrNull { it.name == p[Keys.theme] } ?: ThemeMode.SYSTEM)
     }
+    suspend fun setDistractionThreshold(seconds: Int) {
+        require(seconds in 0..86400)
+        store.edit { it[Keys.threshold] = seconds }
+    }
     suspend fun update(value: UserSettings) {
         require(value.pomodoroMinutes > 0 && value.breakMinutes > 0 && value.distractionThreshold >= 0)
         store.edit { p ->

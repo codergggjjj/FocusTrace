@@ -19,9 +19,12 @@ fun FocusHomeScreen(viewModel: FocusViewModel) {
     var rest by rememberSaveable { mutableStateOf<String?>(null) }
     var taskId by rememberSaveable { mutableStateOf<Long?>(null) }
     var chooseTask by remember { mutableStateOf(false) }
+    var showDistractions by rememberSaveable { mutableStateOf(false) }
+    var showThreshold by rememberSaveable { mutableStateOf(false) }
     var confirmEnd by rememberSaveable { mutableStateOf(false) }
     val s = state.session
     BasePage("专注", "一次只做一件事") {
+        state.lifecycleError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         if (!state.ready) CircularProgressIndicator()
         else if (s != null && s.status in listOf(1, 2, 3)) {
@@ -35,6 +38,7 @@ fun FocusHomeScreen(viewModel: FocusViewModel) {
                 if (s.status == 2) Button(onClick = viewModel::resume, enabled = !state.busy) { Text("继续") }
                 OutlinedButton(onClick = { confirmEnd = true }, enabled = !state.busy) { Text(if (s.status == 3) "结束休息" else "结束专注") }
             }
+            TextButton(onClick = { showDistractions = true }) { Text("分心 ${s.distractionCount} 次 · ${s.distractionSeconds} 秒 · 查看记录") }
         } else if (state.ready) {
             if (s?.status == 4) {
                 InfoCard(if (s.type == 0 && s.focusSeconds >= s.plannedSeconds) "本轮专注完成" else "本轮已结束", "已专注 ${s.focusSeconds / 60} 分 ${s.focusSeconds % 60} 秒 · 记录已保存")
@@ -44,6 +48,8 @@ fun FocusHomeScreen(viewModel: FocusViewModel) {
                 FilterChip(selected = !stopwatch, onClick = { stopwatch = false }, label = { Text("番茄钟") })
                 FilterChip(selected = stopwatch, onClick = { stopwatch = true }, label = { Text("正向计时") })
             }
+            TextButton(onClick = { showThreshold = true }, enabled = !state.busy) { Text("分心判定：${state.settings.distractionThreshold} 秒") }
+            if (s?.status == 4) TextButton(onClick = { showDistractions = true }) { Text("分心 ${s.distractionCount} 次 · ${s.distractionSeconds} 秒 · 查看记录") }
             val focusValue = minutes ?: state.settings.pomodoroMinutes.toString()
             val restValue = rest ?: state.settings.breakMinutes.toString()
             if (!stopwatch) {
@@ -69,6 +75,9 @@ fun FocusHomeScreen(viewModel: FocusViewModel) {
                 }) { Text(if (stopwatch) "开始正向计时" else "开始番茄钟") }
         }
     }
+    if (showDistractions) DistractionHistoryDialog(state.distractions) { showDistractions = false }
+    if (showThreshold) DistractionThresholdDialog(state.settings.distractionThreshold, onDismiss = { showThreshold = false },
+        onSave = { viewModel.setThreshold(it); showThreshold = false })
     if (confirmEnd) AlertDialog(onDismissRequest = { confirmEnd = false }, title = { Text("结束本轮？") }, text = { Text("已完成的专注时间会保留。") },
         confirmButton = { TextButton(enabled = !state.busy, onClick = { confirmEnd = false; viewModel.finish() }) { Text("确认结束") } },
         dismissButton = { TextButton(onClick = { confirmEnd = false }) { Text("取消") } })

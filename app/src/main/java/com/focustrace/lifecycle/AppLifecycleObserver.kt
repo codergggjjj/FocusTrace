@@ -1,7 +1,7 @@
 package com.focustrace.lifecycle
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
-/** Reserved for the distraction-detection phase; register with ProcessLifecycleOwner then. */
+/** Process-level callbacks only; persistence and business rules live in the focus engine. */
 class AppLifecycleObserver(
     private val onBackground: () -> Unit,
     private val onForeground: () -> Unit

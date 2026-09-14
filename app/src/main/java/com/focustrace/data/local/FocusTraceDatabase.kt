@@ -4,7 +4,7 @@ import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.focustrace.data.local.dao.*
 import com.focustrace.data.local.entity.*
-@Database(entities = [CategoryEntity::class, TaskEntity::class, FocusSessionEntity::class, DistractionEventEntity::class], version = 2, exportSchema = true)
+@Database(entities = [CategoryEntity::class, TaskEntity::class, FocusSessionEntity::class, DistractionEventEntity::class], version = 3, exportSchema = true)
 abstract class FocusTraceDatabase : RoomDatabase() {
     abstract fun taskDao(): TaskDao
     abstract fun categoryDao(): CategoryDao
@@ -14,6 +14,14 @@ abstract class FocusTraceDatabase : RoomDatabase() {
         val Migration1To2 = object : androidx.room.migration.Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 mapOf("elapsedMillis" to "0", "anchorWall" to "0", "anchorElapsed" to "0", "bootCount" to "-1", "restSeconds" to "300", "autoBreak" to "1", "autoFocus" to "0").forEach { (name, value) ->
+                    db.execSQL("ALTER TABLE focus_sessions ADD COLUMN $name INTEGER NOT NULL DEFAULT $value")
+                }
+            }
+        }
+        val Migration2To3 = object : androidx.room.migration.Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE focus_sessions ADD COLUMN backgroundWall INTEGER DEFAULT NULL")
+                mapOf("backgroundElapsed" to "0", "backgroundBoot" to "-1", "backgroundThresholdMillis" to "3000").forEach { (name, value) ->
                     db.execSQL("ALTER TABLE focus_sessions ADD COLUMN $name INTEGER NOT NULL DEFAULT $value")
                 }
             }

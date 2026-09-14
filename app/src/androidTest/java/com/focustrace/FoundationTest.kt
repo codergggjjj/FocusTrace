@@ -92,6 +92,25 @@ class FoundationTest {
         compose.onNodeWithText("开始休息").assertDoesNotExist()
     }
 
+    @Test fun thresholdPresetsAndValidationPersist() {
+        val app = ApplicationProvider.getApplicationContext<FocusTraceApplication>()
+        val original = runBlocking { app.container.settingsRepository.settings.first() }
+        try {
+            compose.onAllNodesWithText("专注").onFirst().performClick()
+            compose.waitUntil(5_000) { compose.onAllNodesWithText("分心判定：${original.distractionThreshold} 秒").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithText("分心判定：${original.distractionThreshold} 秒").performScrollTo().performClick()
+            compose.onNodeWithText("宽松 · 10 秒").performClick()
+            compose.onNodeWithText("自定义秒数").performTextReplacement("-1")
+            compose.onNodeWithText("保存判定时间").assertIsNotEnabled()
+            compose.onNodeWithText("自定义秒数").performTextReplacement("10")
+            compose.onNodeWithText("保存判定时间").performClick()
+            compose.waitUntil(5_000) { compose.onAllNodesWithText("分心判定：10 秒").fetchSemanticsNodes().isNotEmpty() }
+            compose.activityRule.scenario.recreate()
+            compose.onNodeWithText("分心判定：10 秒").performScrollTo().assertIsDisplayed()
+            assertEquals(10, runBlocking { app.container.settingsRepository.settings.first().distractionThreshold })
+        } finally { runBlocking { app.container.settingsRepository.update(original) } }
+    }
+
     @Test fun roomRelationsAndTimeBoundaries() = runBlocking {
         val db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), FocusTraceDatabase::class.java)
             .addCallback(FocusTraceDatabase.SeedCategories).build()

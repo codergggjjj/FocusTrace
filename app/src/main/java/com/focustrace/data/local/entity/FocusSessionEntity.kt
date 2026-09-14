@@ -18,5 +18,9 @@ data class FocusSessionEntity(
     @ColumnInfo(defaultValue = "-1") val bootCount: Int = -1,
     @ColumnInfo(defaultValue = "300") val restSeconds: Long = 300,
     @ColumnInfo(defaultValue = "1") val autoBreak: Boolean = true,
-    @ColumnInfo(defaultValue = "0") val autoFocus: Boolean = false
+    @ColumnInfo(defaultValue = "0") val autoFocus: Boolean = false,
+    @ColumnInfo(defaultValue = "NULL") val backgroundWall: Long? = null,
+    @ColumnInfo(defaultValue = "0") val backgroundElapsed: Long = 0,
+    @ColumnInfo(defaultValue = "-1") val backgroundBoot: Int = -1,
+    @ColumnInfo(defaultValue = "3000") val backgroundThresholdMillis: Long = 3000
 )
