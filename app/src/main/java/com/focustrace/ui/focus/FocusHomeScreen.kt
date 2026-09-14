@@ -12,7 +12,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.focustrace.ui.components.*
 
 @Composable
-fun FocusHomeScreen(viewModel: FocusViewModel) {
+fun FocusHomeScreen(viewModel: FocusViewModel, onReport: (Long) -> Unit) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var stopwatch by rememberSaveable { mutableStateOf(false) }
     var minutes by rememberSaveable { mutableStateOf<String?>(null) }
@@ -22,7 +22,15 @@ fun FocusHomeScreen(viewModel: FocusViewModel) {
     var showDistractions by rememberSaveable { mutableStateOf(false) }
     var showThreshold by rememberSaveable { mutableStateOf(false) }
     var confirmEnd by rememberSaveable { mutableStateOf(false) }
+    var runningSessionId by rememberSaveable { mutableStateOf<Long?>(null) }
     val s = state.session
+    LaunchedEffect(s?.id, s?.endTime) {
+        if (s != null && s.endTime == null && s.status in listOf(1, 2)) runningSessionId = s.id
+        else if (s?.endTime != null && runningSessionId == s.id) {
+            runningSessionId = null
+            onReport(s.id)
+        }
+    }
     BasePage("专注", "一次只做一件事") {
         state.lifecycleError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
@@ -38,9 +46,11 @@ fun FocusHomeScreen(viewModel: FocusViewModel) {
                 if (s.status == 2) Button(onClick = viewModel::resume, enabled = !state.busy) { Text("继续") }
                 OutlinedButton(onClick = { confirmEnd = true }, enabled = !state.busy) { Text(if (s.status == 3) "结束休息" else "结束专注") }
             }
+            if (s.endTime != null) OutlinedButton(onClick = { onReport(s.id) }) { Text("查看专注报告") }
             TextButton(onClick = { showDistractions = true }) { Text("分心 ${s.distractionCount} 次 · ${s.distractionSeconds} 秒 · 查看记录") }
         } else if (state.ready) {
             if (s?.status == 4) {
+                Button(onClick = { onReport(s.id) }) { Text("查看专注报告") }
                 InfoCard(if (s.type == 0 && s.focusSeconds >= s.plannedSeconds) "本轮专注完成" else "本轮已结束", "已专注 ${s.focusSeconds / 60} 分 ${s.focusSeconds % 60} 秒 · 记录已保存")
                 if (s.type == 0 && s.focusSeconds >= s.plannedSeconds) OutlinedButton(onClick = viewModel::rest, enabled = !state.busy) { Text("开始休息") }
             }

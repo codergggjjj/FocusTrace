@@ -12,6 +12,8 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.*
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 import com.focustrace.data.AppContainer
 import com.focustrace.ui.todo.*
 import com.focustrace.ui.focus.*
@@ -28,7 +30,7 @@ fun AppNavigation(container: AppContainer) {
     val controller = rememberNavController()
     val entry by controller.currentBackStackEntryAsState()
     Scaffold(bottomBar = {
-        NavigationBar {
+        if (entry?.destination?.route != "report/{sessionId}") NavigationBar {
             Tab.entries.forEach { tab ->
                 NavigationBarItem(selected = entry?.destination?.route == tab.route,
                     onClick = {
@@ -46,7 +48,15 @@ fun AppNavigation(container: AppContainer) {
                 TodoScreen(viewModel(factory = viewModelFactory { initializer { TodoViewModel(container.taskRepository) } }))
             }
             composable(Tab.FOCUS.route) {
-                FocusHomeScreen(viewModel(factory = viewModelFactory { initializer { FocusViewModel(container) } }))
+                FocusHomeScreen(viewModel(factory = viewModelFactory { initializer { FocusViewModel(container) } })) { id ->
+                    controller.navigate("report/$id") { launchSingleTop = true }
+                }
+            }
+            composable("report/{sessionId}", arguments = listOf(navArgument("sessionId") { type = NavType.LongType })) { reportEntry ->
+                val sessionId = reportEntry.arguments!!.getLong("sessionId")
+                FocusResultScreen(viewModel(factory = viewModelFactory { initializer { FocusResultViewModel(container.focusRepository, sessionId) } })) {
+                    controller.popBackStack()
+                }
             }
             composable(Tab.STATISTICS.route) {
                 StatisticsScreen(viewModel(factory = viewModelFactory { initializer { StatisticsViewModel(container.statisticsRepository) } }))

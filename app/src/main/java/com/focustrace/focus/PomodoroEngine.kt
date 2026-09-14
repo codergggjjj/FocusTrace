@@ -33,19 +33,21 @@ class PomodoroEngine(private val db: FocusTraceDatabase, private val clock: Time
         return s.elapsedMillis + delta.coerceAtLeast(0)
     }
     private fun anchored(s: FocusSessionEntity, at: TimerInstant = clock.snapshot()) = s.copy(anchorWall = at.wall, anchorElapsed = at.elapsed, bootCount = at.boot)
+    private suspend fun taskTitle(taskId: Long?): String = if (taskId == null) "自由专注"
+        else checkNotNull(db.taskDao().getTask(taskId)) { "待办已被删除" }.title
     suspend fun start(taskId: Long?, seconds: Long, restSeconds: Long, autoBreak: Boolean, autoFocus: Boolean): Unit = lock.withLock {
         require(seconds in 1..86400 && restSeconds in 1..86400)
         db.withTransaction {
             check(dao.latest()?.status !in listOf(1, 2, 3)) { "已有专注正在进行" }
             dao.insert(anchored(FocusSessionEntity(taskId = taskId, type = 0, startTime = clock.wall(), plannedSeconds = seconds,
-                status = 1, restSeconds = restSeconds, autoBreak = autoBreak, autoFocus = autoFocus)))
+                status = 1, restSeconds = restSeconds, autoBreak = autoBreak, autoFocus = autoFocus, taskTitleSnapshot = taskTitle(taskId))))
         }
     }
     suspend fun startStopwatch(taskId: Long?): Unit = lock.withLock {
         db.withTransaction {
             check(dao.latest()?.status !in listOf(1, 2, 3)) { "已有专注正在进行" }
             dao.insert(anchored(FocusSessionEntity(taskId = taskId, type = 1, startTime = clock.wall(), plannedSeconds = 0,
-                status = 1, autoBreak = false, autoFocus = false)))
+                status = 1, autoBreak = false, autoFocus = false, taskTitleSnapshot = taskTitle(taskId))))
         }
     }
     private fun focusElapsed(s: FocusSessionEntity) = if (s.type == 1) elapsed(s) else elapsed(s).coerceAtMost(s.plannedSeconds * 1000)
@@ -63,7 +65,7 @@ class PomodoroEngine(private val db: FocusTraceDatabase, private val clock: Time
             dao.update(s)
             if (s.autoFocus) {
                 val next = anchored(FocusSessionEntity(taskId = s.taskId, type = 0, startTime = at.wall, plannedSeconds = s.plannedSeconds,
-                    status = 1, restSeconds = s.restSeconds, autoBreak = s.autoBreak, autoFocus = s.autoFocus), at)
+                    status = 1, restSeconds = s.restSeconds, autoBreak = s.autoBreak, autoFocus = s.autoFocus, taskTitleSnapshot = s.taskTitleSnapshot), at)
                 s = next.copy(id = dao.insert(next))
             }
         }

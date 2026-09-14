@@ -22,5 +22,6 @@ data class FocusSessionEntity(
     @ColumnInfo(defaultValue = "NULL") val backgroundWall: Long? = null,
     @ColumnInfo(defaultValue = "0") val backgroundElapsed: Long = 0,
     @ColumnInfo(defaultValue = "-1") val backgroundBoot: Int = -1,
-    @ColumnInfo(defaultValue = "3000") val backgroundThresholdMillis: Long = 3000
+    @ColumnInfo(defaultValue = "3000") val backgroundThresholdMillis: Long = 3000,
+    @ColumnInfo(defaultValue = "NULL") val taskTitleSnapshot: String? = null
 )

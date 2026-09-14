@@ -6,6 +6,8 @@ import kotlinx.coroutines.flow.Flow
 interface TaskDao {
     @Query("SELECT * FROM tasks ORDER BY createdAt DESC, id DESC")
     fun getAll(): Flow<List<TaskEntity>>
+    @Query("SELECT * FROM tasks WHERE id = :id")
+    suspend fun getTask(id: Long): TaskEntity?
     @Insert suspend fun insert(value: TaskEntity): Long
     @Update suspend fun update(value: TaskEntity)
     @Delete suspend fun delete(value: TaskEntity)

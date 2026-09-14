@@ -4,7 +4,7 @@ import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.focustrace.data.local.dao.*
 import com.focustrace.data.local.entity.*
-@Database(entities = [CategoryEntity::class, TaskEntity::class, FocusSessionEntity::class, DistractionEventEntity::class], version = 3, exportSchema = true)
+@Database(entities = [CategoryEntity::class, TaskEntity::class, FocusSessionEntity::class, DistractionEventEntity::class], version = 4, exportSchema = true)
 abstract class FocusTraceDatabase : RoomDatabase() {
     abstract fun taskDao(): TaskDao
     abstract fun categoryDao(): CategoryDao
@@ -24,6 +24,12 @@ abstract class FocusTraceDatabase : RoomDatabase() {
                 mapOf("backgroundElapsed" to "0", "backgroundBoot" to "-1", "backgroundThresholdMillis" to "3000").forEach { (name, value) ->
                     db.execSQL("ALTER TABLE focus_sessions ADD COLUMN $name INTEGER NOT NULL DEFAULT $value")
                 }
+            }
+        }
+        val Migration3To4 = object : androidx.room.migration.Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE focus_sessions ADD COLUMN taskTitleSnapshot TEXT DEFAULT NULL")
+                db.execSQL("UPDATE focus_sessions SET taskTitleSnapshot = (SELECT title FROM tasks WHERE tasks.id = focus_sessions.taskId) WHERE taskId IS NOT NULL")
             }
         }
         val SeedCategories = object : Callback() {

@@ -111,6 +111,56 @@ class FoundationTest {
         } finally { runBlocking { app.container.settingsRepository.update(original) } }
     }
 
+    @Test fun reportDisplaysPersistedMetricsAndSurvivesRecreation() {
+        val app = ApplicationProvider.getApplicationContext<FocusTraceApplication>()
+        val db = app.container.database
+        val sessionId = runBlocking {
+            app.container.lifecycle.awaitEvents()
+            app.container.pomodoro.finish()
+            val id = db.focusSessionDao().insert(FocusSessionEntity(type = 0, startTime = 1000000, endTime = 4403000,
+                plannedSeconds = 3000, focusSeconds = 3000, status = 4, taskTitleSnapshot = "报告样例", distractionCount = 3, distractionSeconds = 403))
+            db.distractionDao().insert(DistractionEventEntity(sessionId = id, backgroundTime = 1751000, foregroundTime = 1822000, durationSeconds = 71))
+            db.distractionDao().insert(DistractionEventEntity(sessionId = id, backgroundTime = 2635000, foregroundTime = 2930000, durationSeconds = 295))
+            db.distractionDao().insert(DistractionEventEntity(sessionId = id, backgroundTime = 3666000, foregroundTime = 3703000, durationSeconds = 37))
+            id
+        }
+        try {
+            compose.onAllNodesWithText("专注").onFirst().performClick()
+            compose.waitUntil(5000) { compose.onAllNodesWithText("查看专注报告").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithText("查看专注报告").performScrollTo().performClick()
+            compose.waitUntil(5000) { compose.onAllNodesWithText("报告样例").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithTag("report-list").performScrollToNode(hasTestTag("report-focus-percent"))
+            compose.onNodeWithTag("report-focus-percent").assertTextEquals("88%")
+            compose.onNodeWithTag("report-list").performScrollToNode(hasText("开始后 12 分 31 秒"))
+            compose.onNodeWithText("开始后 12 分 31 秒").assertIsDisplayed()
+            compose.activityRule.scenario.recreate()
+            compose.onNodeWithText("专注报告").assertIsDisplayed()
+            compose.onNodeWithTag("report-list").performScrollToNode(hasTestTag("report-focus-percent"))
+            compose.onNodeWithTag("report-focus-percent").assertTextEquals("88%")
+            compose.onNodeWithText("返回专注").performClick()
+            compose.onNodeWithText("查看专注报告").performScrollTo().assertIsDisplayed()
+        } finally {
+            runBlocking { db.focusSessionDao().getSession(sessionId)?.let { db.focusSessionDao().delete(it) } }
+        }
+    }
+
+    @Test fun naturalCompletionOpensReportAndKeepsRestRunning() {
+        val app = ApplicationProvider.getApplicationContext<FocusTraceApplication>()
+        compose.onAllNodesWithText("专注").onFirst().performClick()
+        runBlocking {
+            app.container.lifecycle.awaitEvents()
+            app.container.pomodoro.finish()
+            app.container.pomodoro.start(null, 4, 60, true, false)
+        }
+        try {
+            compose.waitUntil(10000) { compose.onAllNodesWithText("专注报告").fetchSemanticsNodes().isNotEmpty() }
+            compose.waitUntil(5000) { compose.onAllNodesWithText("本轮专注完成").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithText("返回专注").performClick()
+            compose.onNodeWithText("正在休息").assertIsDisplayed()
+            compose.onNodeWithText("查看专注报告").assertIsDisplayed()
+        } finally { runBlocking { app.container.pomodoro.finish() } }
+    }
+
     @Test fun roomRelationsAndTimeBoundaries() = runBlocking {
         val db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), FocusTraceDatabase::class.java)
             .addCallback(FocusTraceDatabase.SeedCategories).build()
