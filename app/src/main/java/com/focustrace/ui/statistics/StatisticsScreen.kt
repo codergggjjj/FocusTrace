@@ -18,17 +18,16 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.focustrace.focus.formatDuration
 import com.focustrace.statistics.*
-import com.focustrace.ui.components.LoadState
+import com.focustrace.ui.components.*
 
 @Composable
 fun StatisticsScreen(viewModel: StatisticsViewModel) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val selection by viewModel.selection.collectAsStateWithLifecycle()
-    LazyColumn(Modifier.fillMaxSize().testTag("statistics-list"), contentPadding = PaddingValues(24.dp),
+    LazyColumn(Modifier.fillMaxSize().testTag("statistics-list"), contentPadding = PaddingValues(20.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)) {
         item {
-            Text("统计", style = MaterialTheme.typography.headlineLarge)
-            Text("看见专注，也理解分心", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            PageHeader("统计", "看见专注，也理解分心")
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -55,14 +54,19 @@ fun StatisticsScreen(viewModel: StatisticsViewModel) {
                 val summary = value.value
                 item {
                     val totals = summary.totals
-                    Card(Modifier.fillMaxWidth()) {
-                        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    TraceCard {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Text("专注概览", style = MaterialTheme.typography.titleLarge)
-                            Text(formatDuration(totals.focusSeconds), style = MaterialTheme.typography.headlineMedium)
-                            Metric("专注次数", "${totals.sessions} 次")
-                            Metric("完成番茄", "${totals.pomodoros} 个")
-                            Metric("分心次数", "${totals.distractions} 次")
-                            Metric("分心时间", formatDuration(totals.distractionSeconds))
+                            Text(formatDuration(totals.focusSeconds), style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                SummaryMetric("专注次数", "${totals.sessions} 次", Modifier.weight(1f))
+                                SummaryMetric("完成番茄", "${totals.pomodoros} 个", Modifier.weight(1f))
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                SummaryMetric("分心次数", "${totals.distractions} 次", Modifier.weight(1f))
+                                SummaryMetric("分心时间", formatDuration(totals.distractionSeconds), Modifier.weight(1f))
+                            }
                             Metric("专注率", totals.focusPercent?.let { "$it%" } ?: "—")
                             Metric("平均分心时长", totals.averageDistractionSeconds?.let(::formatDuration) ?: "—")
                             Metric("平均首次分心时间", totals.averageFirstDistractionSeconds?.let(::formatDuration) ?: "—")
@@ -87,8 +91,8 @@ fun StatisticsScreen(viewModel: StatisticsViewModel) {
 @Composable
 private fun Metric(label: String, value: String) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text(label, Modifier.weight(1f))
-        Text(value, Modifier.weight(1f))
+        Text(label, Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+        Text(value, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
     }
 }
 
@@ -104,7 +108,7 @@ private fun DailyChart(summary: StatisticsSummary) {
     }
     fun display(day: DailyStatistics) = if (metric == 1) "${amount(day)} 次" else formatDuration(amount(day))
     val maximum = summary.days.maxOfOrNull(::amount)?.coerceAtLeast(1) ?: 1
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    TraceCard {
         Text("每日趋势", style = MaterialTheme.typography.titleLarge)
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             labels.forEachIndexed { index, label ->
@@ -118,7 +122,7 @@ private fun DailyChart(summary: StatisticsSummary) {
                     .clickable { selectedDay = index }, horizontalAlignment = Alignment.CenterHorizontally) {
                     Box(Modifier.height(120.dp).fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
                         Box(Modifier.width(24.dp).height((120f * amount(day).toDouble() / maximum).toFloat().dp)
-                            .background(if (selectedDay == index) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer))
+                            .background(if (selectedDay == index) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary))
                     }
                     Text("${day.date.monthValue}/${day.date.dayOfMonth}", style = MaterialTheme.typography.labelSmall)
                 }
@@ -126,5 +130,13 @@ private fun DailyChart(summary: StatisticsSummary) {
         }
         summary.days.getOrNull(selectedDay)?.let { Text("${it.date} · ${labels[metric]}：${display(it)}") }
         Text("点击柱形查看数值，左右滑动查看更多日期。", style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+@Composable
+private fun SummaryMetric(label: String, value: String, modifier: Modifier) {
+    Column(modifier.padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.titleLarge)
     }
 }

@@ -1,5 +1,7 @@
 package com.focustrace.navigation
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -31,9 +33,14 @@ fun AppNavigation(container: AppContainer) {
     val controller = rememberNavController()
     val entry by controller.currentBackStackEntryAsState()
     Scaffold(bottomBar = {
-        if (entry?.destination?.route != "report/{sessionId}") NavigationBar {
+        if (entry?.destination?.route != "report/{sessionId}") NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
             Tab.entries.forEach { tab ->
-                NavigationBarItem(selected = entry?.destination?.route == tab.route,
+                NavigationBarItem(colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                    indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant), selected = entry?.destination?.route == tab.route,
                     onClick = {
                         controller.navigate(tab.route) {
                             popUpTo(controller.graph.findStartDestination().id) { saveState = true }
@@ -44,26 +51,28 @@ fun AppNavigation(container: AppContainer) {
             }
         }
     }) { padding ->
-        NavHost(controller, startDestination = Tab.TODO.route, modifier = Modifier.padding(padding)) {
-            composable(Tab.TODO.route) {
-                TodoScreen(viewModel(factory = viewModelFactory { initializer { TodoViewModel(container.taskRepository) } }))
-            }
-            composable(Tab.FOCUS.route) {
-                FocusHomeScreen(viewModel(factory = viewModelFactory { initializer { FocusViewModel(container) } })) { id ->
-                    controller.navigate("report/$id") { launchSingleTop = true }
+        Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
+            NavHost(controller, startDestination = Tab.TODO.route, modifier = Modifier.widthIn(max = 640.dp).fillMaxSize()) {
+                composable(Tab.TODO.route) {
+                    TodoScreen(viewModel(factory = viewModelFactory { initializer { TodoViewModel(container.taskRepository) } }))
                 }
-            }
-            composable("report/{sessionId}", arguments = listOf(navArgument("sessionId") { type = NavType.LongType })) { reportEntry ->
-                val sessionId = reportEntry.arguments!!.getLong("sessionId")
-                FocusResultScreen(viewModel(factory = viewModelFactory { initializer { FocusResultViewModel(container.focusRepository, sessionId) } })) {
-                    controller.popBackStack()
+                composable(Tab.FOCUS.route) {
+                    FocusHomeScreen(viewModel(factory = viewModelFactory { initializer { FocusViewModel(container) } })) { id ->
+                        controller.navigate("report/$id") { launchSingleTop = true }
+                    }
                 }
-            }
-            composable(Tab.STATISTICS.route) {
-                StatisticsScreen(viewModel(factory = viewModelFactory { initializer { StatisticsViewModel(container.statisticsRepository, createSavedStateHandle()) } }))
-            }
-            composable(Tab.PROFILE.route) {
-                ProfileScreen(viewModel(factory = viewModelFactory { initializer { SettingsViewModel(container.settingsRepository) } }))
+                composable("report/{sessionId}", arguments = listOf(navArgument("sessionId") { type = NavType.LongType })) { reportEntry ->
+                    val sessionId = reportEntry.arguments!!.getLong("sessionId")
+                    FocusResultScreen(viewModel(factory = viewModelFactory { initializer { FocusResultViewModel(container.focusRepository, sessionId) } })) {
+                        controller.popBackStack()
+                    }
+                }
+                composable(Tab.STATISTICS.route) {
+                    StatisticsScreen(viewModel(factory = viewModelFactory { initializer { StatisticsViewModel(container.statisticsRepository, createSavedStateHandle()) } }))
+                }
+                composable(Tab.PROFILE.route) {
+                    ProfileScreen(viewModel(factory = viewModelFactory { initializer { SettingsViewModel(container.settingsRepository) } }))
+                }
             }
         }
     }

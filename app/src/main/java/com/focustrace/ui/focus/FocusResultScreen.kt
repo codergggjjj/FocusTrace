@@ -46,7 +46,7 @@ fun FocusResultScreen(viewModel: FocusResultViewModel, onBack: () -> Unit) {
 private fun ReportContent(report: FocusReport, modifier: Modifier) {
     val s = report.session
     val formatter = remember { DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.systemDefault()) }
-    LazyColumn(modifier.fillMaxWidth().testTag("report-list"), contentPadding = PaddingValues(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    LazyColumn(modifier.fillMaxWidth().testTag("report-list"), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
             Text(if (report.completedPomodoro) "本轮专注完成" else "本轮已结束", style = MaterialTheme.typography.titleLarge)
             Text(report.title, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(top = 8.dp))
@@ -56,10 +56,10 @@ private fun ReportContent(report: FocusReport, modifier: Modifier) {
             InfoCard("专注时长", "有效专注：${formatDuration(s.focusSeconds)}\n计划时长：${if (s.type == 0) formatDuration(s.plannedSeconds) else "不限时"}")
         }
         item {
-            Card(Modifier.fillMaxWidth()) {
+            Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("专注率", style = MaterialTheme.typography.titleLarge)
-                    Text(report.focusPercent?.let { "$it%" } ?: "—", style = MaterialTheme.typography.displaySmall, modifier = Modifier.testTag("report-focus-percent"))
+                    Text(report.focusPercent?.let { "$it%" } ?: "—", style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.testTag("report-focus-percent"))
                     Text("有效专注 ÷（有效专注 + 分心时间）")
                     if (report.focusPercent == null) Text("累计时长不足 1 秒，暂不计算比例。")
                 }
@@ -75,7 +75,7 @@ private fun ReportContent(report: FocusReport, modifier: Modifier) {
         item { Text("分心明细", style = MaterialTheme.typography.titleLarge) }
         if (report.events.isEmpty()) item { Text("本轮暂无分心记录。") }
         items(report.events, key = { it.id }) { event ->
-            Card(Modifier.fillMaxWidth()) {
+            Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("离开：${formatter.format(Instant.ofEpochMilli(event.backgroundTime))}")
                     Text("返回：${formatter.format(Instant.ofEpochMilli(event.foregroundTime))}")
