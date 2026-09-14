@@ -34,6 +34,32 @@ class FoundationTest {
         compose.onNodeWithText("把注意力留给重要的事").assertIsDisplayed()
     }
 
+    @Test fun taskCrudPersistsAndValidatesInput() {
+        compose.onNodeWithText("创建待办").performClick()
+        compose.onNodeWithText("保存").assertIsNotEnabled()
+        compose.onNodeWithText("待办名称").performTextInput("验证任务")
+        compose.onNodeWithText("目标分钟数").performTextReplacement("0")
+        compose.onNodeWithText("保存").assertIsNotEnabled()
+        compose.onNodeWithText("目标分钟数").performTextReplacement("45")
+        compose.onNodeWithText("选择分类").performClick()
+        compose.onAllNodesWithText("学习").onLast().performClick()
+        compose.onNodeWithText("保存").performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("验证任务").fetchSemanticsNodes().isNotEmpty() }
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithText("验证任务").performClick()
+        compose.onNodeWithText("待办名称").performTextReplacement("修改后的任务")
+        compose.onNodeWithText("保存").performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("修改后的任务").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNode(isToggleable()).performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("已完成").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("删除").performClick()
+        compose.onNodeWithText("取消").performClick()
+        compose.onNodeWithText("修改后的任务").assertIsDisplayed()
+        compose.onNodeWithText("删除").performClick()
+        compose.onNodeWithText("确认删除").performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("修改后的任务").fetchSemanticsNodes().isEmpty() }
+    }
+
     @Test fun roomRelationsAndTimeBoundaries() = runBlocking {
         val db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), FocusTraceDatabase::class.java)
             .addCallback(FocusTraceDatabase.SeedCategories).build()
