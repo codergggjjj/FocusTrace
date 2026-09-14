@@ -9,7 +9,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
 data class FocusUiState(val ready: Boolean = false, val session: FocusSessionEntity? = null,
-    val remainingSeconds: Long = 0, val tasks: List<TaskEntity> = emptyList(), val settings: UserSettings = UserSettings(),
+    val remainingSeconds: Long = 0, val elapsedSeconds: Long = 0, val tasks: List<TaskEntity> = emptyList(), val settings: UserSettings = UserSettings(),
     val busy: Boolean = false, val error: String? = null)
 class FocusViewModel(private val container: AppContainer) : ViewModel() {
     private val engine = container.pomodoro
@@ -33,7 +33,7 @@ class FocusViewModel(private val container: AppContainer) : ViewModel() {
         val s = engine.refresh()
         val total = if (s?.status == 3) s.restSeconds else s?.plannedSeconds ?: 0
         val remaining = if (s == null || s.status == 4) 0 else ((total * 1000 - engine.elapsed(s)).coerceAtLeast(0) + 999) / 1000
-        _state.update { it.copy(ready = true, session = s, remainingSeconds = remaining) }
+        _state.update { it.copy(ready = true, session = s, remainingSeconds = remaining, elapsedSeconds = s?.let { session -> engine.elapsed(session) / 1000 } ?: 0) }
     }
     private fun action(block: suspend () -> Unit) {
         if (_state.value.busy) return
@@ -49,6 +49,7 @@ class FocusViewModel(private val container: AppContainer) : ViewModel() {
         val settings = _state.value.settings
         engine.start(taskId, minutes * 60L, rest * 60L, settings.autoStartBreak, settings.autoStartFocus)
     }
+    fun startStopwatch(taskId: Long?) = action { engine.startStopwatch(taskId) }
     fun pause() = action { engine.pause() }
     fun resume() = action { engine.resume() }
     fun finish() = action { engine.finish() }

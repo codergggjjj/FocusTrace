@@ -35,10 +35,18 @@ class PomodoroEngine(private val db: FocusTraceDatabase, private val clock: Time
                 status = 1, restSeconds = restSeconds, autoBreak = autoBreak, autoFocus = autoFocus)))
         }
     }
+    suspend fun startStopwatch(taskId: Long?): Unit = lock.withLock {
+        db.withTransaction {
+            check(dao.latest()?.status !in listOf(1, 2, 3)) { "已有专注正在进行" }
+            dao.insert(anchored(FocusSessionEntity(taskId = taskId, type = 1, startTime = clock.wall(), plannedSeconds = 0,
+                status = 1, autoBreak = false, autoFocus = false)))
+        }
+    }
+    private fun focusElapsed(s: FocusSessionEntity) = if (s.type == 1) elapsed(s) else elapsed(s).coerceAtMost(s.plannedSeconds * 1000)
     suspend fun refresh(): FocusSessionEntity? = lock.withLock { db.withTransaction { advance() } }
     private suspend fun advance(): FocusSessionEntity? {
         var s = dao.latest() ?: return null
-        if (s.status == 1 && elapsed(s) >= s.plannedSeconds * 1000) {
+        if (s.type == 0 && s.status == 1 && elapsed(s) >= s.plannedSeconds * 1000) {
             val overdue = elapsed(s) - s.plannedSeconds * 1000
             s = anchored(s.copy(status = if (s.autoBreak) 3 else 4, focusSeconds = s.plannedSeconds,
                 endTime = clock.wall() - overdue, elapsedMillis = if (s.autoBreak) overdue else s.plannedSeconds * 1000))
@@ -58,7 +66,7 @@ class PomodoroEngine(private val db: FocusTraceDatabase, private val clock: Time
     suspend fun pause(): Unit = lock.withLock { db.withTransaction {
         val s = advance() ?: return@withTransaction
         if (s.status == 1) {
-            val progress = elapsed(s).coerceAtMost(s.plannedSeconds * 1000)
+            val progress = focusElapsed(s)
             dao.update(s.copy(status = 2, elapsedMillis = progress, focusSeconds = progress / 1000))
         }
     } }
@@ -69,12 +77,12 @@ class PomodoroEngine(private val db: FocusTraceDatabase, private val clock: Time
     suspend fun finish(): Unit = lock.withLock { db.withTransaction {
         val s = dao.latest() ?: return@withTransaction
         if (s.status in listOf(1, 2)) {
-            val progress = elapsed(s).coerceAtMost(s.plannedSeconds * 1000)
+            val progress = focusElapsed(s)
             dao.update(s.copy(status = 4, focusSeconds = progress / 1000, elapsedMillis = progress, endTime = clock.wall()))
         } else if (s.status == 3) dao.update(s.copy(status = 4, elapsedMillis = s.plannedSeconds * 1000))
     } }
     suspend fun rest(): Unit = lock.withLock {
         val s = dao.latest()
-        if (s?.status == 4 && s.focusSeconds == s.plannedSeconds) dao.update(anchored(s.copy(status = 3, elapsedMillis = 0)))
+        if (s?.type == 0 && s.status == 4 && s.focusSeconds == s.plannedSeconds) dao.update(anchored(s.copy(status = 3, elapsedMillis = 0)))
     }
 }

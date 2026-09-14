@@ -14,6 +14,7 @@ import com.focustrace.ui.components.*
 @Composable
 fun FocusHomeScreen(viewModel: FocusViewModel) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    var stopwatch by rememberSaveable { mutableStateOf(false) }
     var minutes by rememberSaveable { mutableStateOf<String?>(null) }
     var rest by rememberSaveable { mutableStateOf<String?>(null) }
     var taskId by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -25,9 +26,10 @@ fun FocusHomeScreen(viewModel: FocusViewModel) {
         if (!state.ready) CircularProgressIndicator()
         else if (s != null && s.status in listOf(1, 2, 3)) {
             Text(state.tasks.firstOrNull { it.id == s.taskId }?.title ?: "自由专注", style = MaterialTheme.typography.titleLarge)
-            Text("%02d:%02d".format(state.remainingSeconds / 60, state.remainingSeconds % 60), style = MaterialTheme.typography.displayLarge)
+            val displayedSeconds = if (s.type == 1) state.elapsedSeconds else state.remainingSeconds
+            Text("%02d:%02d".format(displayedSeconds / 60, displayedSeconds % 60), style = MaterialTheme.typography.displayLarge)
             Text(when (s.status) { 1 -> "正在专注"; 2 -> "已暂停"; else -> "正在休息" })
-            LinearProgressIndicator(progress = { 1f - state.remainingSeconds.toFloat() / (if (s.status == 3) s.restSeconds else s.plannedSeconds).coerceAtLeast(1) }, modifier = Modifier.fillMaxWidth())
+            if (s.type == 0) LinearProgressIndicator(progress = { 1f - state.remainingSeconds.toFloat() / (if (s.status == 3) s.restSeconds else s.plannedSeconds).coerceAtLeast(1) }, modifier = Modifier.fillMaxWidth())
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (s.status == 1) Button(onClick = viewModel::pause, enabled = !state.busy) { Text("暂停") }
                 if (s.status == 2) Button(onClick = viewModel::resume, enabled = !state.busy) { Text("继续") }
@@ -35,16 +37,22 @@ fun FocusHomeScreen(viewModel: FocusViewModel) {
             }
         } else if (state.ready) {
             if (s?.status == 4) {
-                InfoCard(if (s.focusSeconds >= s.plannedSeconds) "本轮专注完成" else "本轮已结束", "已专注 ${s.focusSeconds / 60} 分 ${s.focusSeconds % 60} 秒 · 记录已保存")
-                if (s.focusSeconds >= s.plannedSeconds) OutlinedButton(onClick = viewModel::rest, enabled = !state.busy) { Text("开始休息") }
+                InfoCard(if (s.type == 0 && s.focusSeconds >= s.plannedSeconds) "本轮专注完成" else "本轮已结束", "已专注 ${s.focusSeconds / 60} 分 ${s.focusSeconds % 60} 秒 · 记录已保存")
+                if (s.type == 0 && s.focusSeconds >= s.plannedSeconds) OutlinedButton(onClick = viewModel::rest, enabled = !state.busy) { Text("开始休息") }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                FilterChip(selected = !stopwatch, onClick = { stopwatch = false }, label = { Text("番茄钟") })
+                FilterChip(selected = stopwatch, onClick = { stopwatch = true }, label = { Text("正向计时") })
             }
             val focusValue = minutes ?: state.settings.pomodoroMinutes.toString()
             val restValue = rest ?: state.settings.breakMinutes.toString()
+            if (!stopwatch) {
             OutlinedTextField(value = focusValue, onValueChange = { minutes = it.take(5) }, label = { Text("专注分钟") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true)
             OutlinedTextField(value = restValue, onValueChange = { rest = it.take(5) }, label = { Text("休息分钟") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true)
             Text("时长范围：1–1440 分钟")
+            } else Text("从 00:00 开始，直到你主动结束。")
             Box {
                 OutlinedButton(onClick = { chooseTask = true }) { Text(state.tasks.firstOrNull { it.id == taskId }?.title ?: "自由专注（选择待办）") }
                 DropdownMenu(expanded = chooseTask, onDismissRequest = { chooseTask = false }) {
@@ -54,8 +62,11 @@ fun FocusHomeScreen(viewModel: FocusViewModel) {
                     }
                 }
             }
-            Button(enabled = !state.busy && focusValue.toIntOrNull() in 1..1440 && restValue.toIntOrNull() in 1..1440,
-                onClick = { viewModel.start(taskId?.takeIf { id -> state.tasks.any { it.id == id } }, focusValue.toInt(), restValue.toInt()) }) { Text("开始番茄钟") }
+            Button(enabled = !state.busy && (stopwatch || (focusValue.toIntOrNull() in 1..1440 && restValue.toIntOrNull() in 1..1440)),
+                onClick = {
+                    val selected = taskId?.takeIf { id -> state.tasks.any { it.id == id } }
+                    if (stopwatch) viewModel.startStopwatch(selected) else viewModel.start(selected, focusValue.toInt(), restValue.toInt())
+                }) { Text(if (stopwatch) "开始正向计时" else "开始番茄钟") }
         }
     }
     if (confirmEnd) AlertDialog(onDismissRequest = { confirmEnd = false }, title = { Text("结束本轮？") }, text = { Text("已完成的专注时间会保留。") },

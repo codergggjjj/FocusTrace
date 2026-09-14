@@ -77,6 +77,30 @@ class PomodoroTest {
         } finally { db.close() }
     }
 
+    @Test fun stopwatchRunsBeyondOneDayAndRestoresPausedProgress() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), FocusTraceDatabase::class.java).build()
+        try {
+            val clock = Clock()
+            var engine = PomodoroEngine(db, clock)
+            engine.startStopwatch(null)
+            assertEquals(0L, engine.elapsed(engine.refresh()!!))
+            clock.advance(90000500)
+            assertEquals(1, engine.refresh()!!.status)
+            engine.pause()
+            clock.advance(30000)
+            engine = PomodoroEngine(db, clock)
+            assertEquals(90000500L, engine.elapsed(engine.refresh()!!))
+            engine.resume()
+            clock.advance(1500)
+            engine.finish()
+            assertEquals(90002L, engine.refresh()!!.focusSeconds)
+            assertEquals(1, engine.refresh()!!.type)
+            assertEquals(0L, engine.refresh()!!.plannedSeconds)
+            engine.rest()
+            assertEquals(4, engine.refresh()!!.status)
+        } finally { db.close() }
+    }
+
     @Test fun delayedRefreshAndRebootDoNotOvercount() = runBlocking {
         val db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), FocusTraceDatabase::class.java).build()
         try {

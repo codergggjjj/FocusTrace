@@ -75,6 +75,23 @@ class FoundationTest {
         compose.waitUntil(5_000) { compose.onAllNodesWithText("本轮已结束").fetchSemanticsNodes().isNotEmpty() }
     }
 
+    @Test fun stopwatchUiModePauseAndFinish() {
+        compose.onAllNodesWithText("专注").onFirst().performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("正向计时").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("正向计时").performScrollTo().performClick()
+        compose.onNodeWithText("专注分钟").assertDoesNotExist()
+        compose.onNodeWithText("开始正向计时").performScrollTo().performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("暂停").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("暂停").performScrollTo().performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("继续").fetchSemanticsNodes().isNotEmpty() }
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithText("继续").performScrollTo().performClick()
+        compose.onNodeWithText("结束专注").performClick()
+        compose.onNodeWithText("确认结束").performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("本轮已结束").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("开始休息").assertDoesNotExist()
+    }
+
     @Test fun roomRelationsAndTimeBoundaries() = runBlocking {
         val db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), FocusTraceDatabase::class.java)
             .addCallback(FocusTraceDatabase.SeedCategories).build()
