@@ -6,6 +6,8 @@ import kotlinx.coroutines.flow.Flow
 interface FocusSessionDao {
     @Query("SELECT * FROM focus_sessions ORDER BY startTime DESC, id DESC")
     fun getAll(): Flow<List<FocusSessionEntity>>
+    @Query("SELECT * FROM focus_sessions ORDER BY id DESC LIMIT 1")
+    suspend fun latest(): FocusSessionEntity?
     @Insert suspend fun insert(value: FocusSessionEntity): Long
     @Update suspend fun update(value: FocusSessionEntity)
     @Delete suspend fun delete(value: FocusSessionEntity)

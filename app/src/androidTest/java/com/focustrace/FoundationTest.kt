@@ -60,6 +60,21 @@ class FoundationTest {
         compose.waitUntil(5_000) { compose.onAllNodesWithText("修改后的任务").fetchSemanticsNodes().isEmpty() }
     }
 
+    @Test fun pomodoroUiPauseResumeAndFinish() {
+        compose.onAllNodesWithText("专注").onFirst().performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("开始番茄钟").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("开始番茄钟").performScrollTo().performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("暂停").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("暂停").performScrollTo().performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("已暂停").fetchSemanticsNodes().isNotEmpty() }
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithText("继续").performScrollTo().performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("正在专注").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("结束专注").performClick()
+        compose.onNodeWithText("确认结束").performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("本轮已结束").fetchSemanticsNodes().isNotEmpty() }
+    }
+
     @Test fun roomRelationsAndTimeBoundaries() = runBlocking {
         val db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), FocusTraceDatabase::class.java)
             .addCallback(FocusTraceDatabase.SeedCategories).build()

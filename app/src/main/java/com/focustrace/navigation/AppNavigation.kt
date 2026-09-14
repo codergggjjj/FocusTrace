@@ -46,7 +46,7 @@ fun AppNavigation(container: AppContainer) {
                 TodoScreen(viewModel(factory = viewModelFactory { initializer { TodoViewModel(container.taskRepository) } }))
             }
             composable(Tab.FOCUS.route) {
-                FocusHomeScreen(viewModel(factory = viewModelFactory { initializer { FocusViewModel(container.settingsRepository) } }))
+                FocusHomeScreen(viewModel(factory = viewModelFactory { initializer { FocusViewModel(container) } }))
             }
             composable(Tab.STATISTICS.route) {
                 StatisticsScreen(viewModel(factory = viewModelFactory { initializer { StatisticsViewModel(container.statisticsRepository) } }))

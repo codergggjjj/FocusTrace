@@ -6,7 +6,8 @@ import com.focustrace.data.datastore.SettingsDataStore
 import com.focustrace.data.repository.*
 class AppContainer(context: Context) {
     val database = Room.databaseBuilder(context.applicationContext, FocusTraceDatabase::class.java, "focustrace.db")
-        .addCallback(FocusTraceDatabase.SeedCategories).build()
+        .addMigrations(FocusTraceDatabase.Migration1To2).addCallback(FocusTraceDatabase.SeedCategories).build()
+    val pomodoro = com.focustrace.focus.PomodoroEngine(database, com.focustrace.focus.AndroidTimerClock(context))
     val taskRepository = TaskRepository(database.taskDao(), database.categoryDao())
     val focusRepository = FocusRepository(database.focusSessionDao(), database.distractionDao())
     val statisticsRepository = StatisticsRepository(database.focusSessionDao())
