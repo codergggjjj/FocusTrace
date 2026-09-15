@@ -19,7 +19,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.focustrace.ui.components.*
 
 @Composable
-fun TodoScreen(viewModel: TodoViewModel, onStarted: () -> Unit) {
+fun TodoScreen(viewModel: TodoViewModel, onReport: (Long) -> Unit, onStarted: () -> Unit) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val busy by viewModel.busy.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
@@ -36,6 +36,12 @@ fun TodoScreen(viewModel: TodoViewModel, onStarted: () -> Unit) {
             TextButton(onClick = { categoryOpen = true }, enabled = !busy) { Text("添加分类") }
         }
         StateContent(state) { data ->
+            data.reportId?.let { id -> TextButton(onClick = { onReport(id) }) { Text("查看专注报告") } }
+            data.activeSession?.let { session ->
+                OutlinedButton(onClick = onStarted, modifier = Modifier.fillMaxWidth()) {
+                    Text("返回计时 · ${session.taskTitleSnapshot ?: "自由专注"}")
+                }
+            }
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(selected = filter == null, onClick = { filter = null }, label = { Text("全部") })
                 data.categories.forEach { category ->
@@ -49,13 +55,13 @@ fun TodoScreen(viewModel: TodoViewModel, onStarted: () -> Unit) {
                 items(tasks, key = { it.id }) { task ->
                     Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
                         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(checked = task.completed, onCheckedChange = { viewModel.toggle(task) }, enabled = !busy)
+                            Checkbox(modifier = Modifier.testTag("complete-task-${task.id}"), checked = task.completed, onCheckedChange = { viewModel.toggle(task) }, enabled = !busy)
                             Column(Modifier.weight(1f).clickable(enabled = !busy) { editingId = task.id; editorOpen = true }) {
                                 Text(task.title, style = MaterialTheme.typography.titleMedium, textDecoration = if (task.completed) TextDecoration.LineThrough else null, color = if (task.completed) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
                                 Text("${data.categories.firstOrNull { it.id == task.categoryId }?.name ?: "未分类"} · ${if (task.timerType == 1) "正向计时" else "番茄钟 · ${task.targetMinutes} 分钟"}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 if (task.completed) Text("已完成")
                             }
-                            TextButton(onClick = { deletingId = task.id }, enabled = !busy) { Text("删除") }
+                            TextButton(modifier = Modifier.testTag("delete-task-${task.id}"), onClick = { deletingId = task.id }, enabled = !busy) { Text("删除") }
                         }
                         if (!task.completed) {
                             Button(onClick = { viewModel.start(task.id, onStarted) }, enabled = !busy,

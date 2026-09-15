@@ -7,7 +7,7 @@ import com.focustrace.ui.components.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
-data class TodoData(val tasks: List<TaskEntity>, val categories: List<CategoryEntity>)
+data class TodoData(val tasks: List<TaskEntity>, val categories: List<CategoryEntity>, val activeSession: FocusSessionEntity?, val reportId: Long?)
 class TodoViewModel(private val container: com.focustrace.data.AppContainer) : ViewModel() {
     private val repository = container.taskRepository
     fun start(taskId: Long, onStarted: () -> Unit) {
@@ -16,8 +16,10 @@ class TodoViewModel(private val container: com.focustrace.data.AppContainer) : V
         viewModelScope.launch {
             try {
                 container.lifecycle.awaitEvents()
-                if (container.pomodoro.refresh()?.status in listOf(1, 2, 3)) {
-                    _error.value = "已有计时正在进行，请先到专注页结束当前专注或休息。"
+                val current = container.pomodoro.refresh()
+                if (current?.status in listOf(1, 2, 3)) {
+                    if (current?.taskId == taskId) onStarted()
+                    else _error.value = "已有其他计时，请点击「返回计时」处理当前专注或休息。"
                     return@launch
                 }
                 val task = repository.allTasks.first().firstOrNull { it.id == taskId }
@@ -36,7 +38,7 @@ class TodoViewModel(private val container: com.focustrace.data.AppContainer) : V
         }
     }
 
-    val uiState = combine(repository.allTasks, repository.allCategories) { tasks, categories -> TodoData(tasks, categories) }
+    val uiState = combine(repository.allTasks, repository.allCategories, container.database.focusSessionDao().observeLatest()) { tasks, categories, session -> TodoData(tasks, categories, session?.takeIf { it.status in listOf(1, 2, 3) }, session?.takeIf { it.endTime != null }?.id) }
         .asLoadState().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LoadState.Loading)
     private val _busy = MutableStateFlow(false)
     val busy = _busy.asStateFlow()

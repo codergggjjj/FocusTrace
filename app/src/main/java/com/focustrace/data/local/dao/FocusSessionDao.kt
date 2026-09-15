@@ -8,6 +8,8 @@ interface FocusSessionDao {
     fun getAll(): Flow<List<FocusSessionEntity>>
     @Query("SELECT * FROM focus_sessions ORDER BY id DESC LIMIT 1")
     suspend fun latest(): FocusSessionEntity?
+    @Query("SELECT * FROM focus_sessions ORDER BY id DESC LIMIT 1")
+    fun observeLatest(): Flow<FocusSessionEntity?>
     @Transaction
     @Query("SELECT * FROM focus_sessions WHERE id = :id")
     fun observeReport(id: Long): Flow<com.focustrace.data.local.entity.SessionWithDistractions?>

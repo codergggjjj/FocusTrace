@@ -20,10 +20,9 @@ import org.junit.runner.RunWith
 class FoundationTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
 
-    @Test fun fourTabsNavigateAndSurviveRecreation() {
+    @Test fun threeTabsNavigateAndSurviveRecreation() {
         compose.onNodeWithText("把注意力留给重要的事").assertIsDisplayed()
-        compose.onAllNodesWithText("专注").onFirst().performClick()
-        compose.onNodeWithText("一次只做一件事").assertIsDisplayed()
+        compose.onNodeWithText("专注").assertDoesNotExist()
         compose.onAllNodesWithText("统计").onFirst().performClick()
         compose.onNodeWithText("看见专注，也理解分心").assertIsDisplayed()
         compose.onAllNodesWithText("我的").onFirst().performClick()
@@ -60,7 +59,8 @@ class FoundationTest {
         compose.onNodeWithText("正向计时").assertIsSelected()
         compose.onNodeWithText("保存").performClick()
         compose.waitUntil(5000) { compose.onAllNodesWithText("正向待办验证").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("正向待办验证").performClick()
+        compose.onNodeWithTag("todo-list").performScrollToNode(hasText("正向待办验证"))
+        compose.onNodeWithText("正向待办验证").performScrollTo().performClick()
         compose.onNodeWithText("正向计时").assertIsSelected()
         compose.onNodeWithText("番茄钟").performClick()
         compose.onNodeWithText("目标分钟数").performTextReplacement("15")
@@ -69,10 +69,8 @@ class FoundationTest {
         val app = ApplicationProvider.getApplicationContext<FocusTraceApplication>()
         val task = runBlocking { app.container.database.taskDao().getAll().first().first { it.title == "正向待办验证" } }
         assertEquals(1, task.timerType)
-        compose.onAllNodesWithText("专注").onFirst().performClick()
-        compose.onNodeWithText("自由专注（选择待办）").performScrollTo().performClick()
-        compose.onNodeWithText("正向待办验证").performClick()
-        compose.onNodeWithText("开始正向计时").performScrollTo().performClick()
+        compose.onNodeWithTag("todo-list").performScrollToNode(hasTestTag("start-task-${task.id}"))
+        compose.onNodeWithTag("start-task-${task.id}").performClick()
         compose.waitUntil(5000) { compose.onAllNodesWithText("正在专注").fetchSemanticsNodes().isNotEmpty() }
         val session = runBlocking { app.container.database.focusSessionDao().latest()!! }
         assertEquals(task.id, session.taskId)
@@ -104,12 +102,20 @@ class FoundationTest {
         assertEquals(if (timerType == 0) 720L else 0L, session.plannedSeconds)
         compose.onNodeWithText("暂停").performScrollTo().performClick()
         compose.waitUntil(5000) { compose.onAllNodesWithText("已暂停").fetchSemanticsNodes().isNotEmpty() }
-        compose.onAllNodesWithText("待办").onFirst().performClick()
+        compose.onNodeWithText("返回待办").performScrollTo().performClick()
+        val other = TaskEntity(title = "另一个任务", targetMinutes = 5, createdAt = 2, updatedAt = 2)
+        val otherId = runBlocking { db.taskDao().insert(other) }
+        try {
+            compose.onNodeWithTag("todo-list").performScrollToNode(hasTestTag("start-task-$otherId"))
+            compose.onNodeWithTag("start-task-$otherId").performClick()
+            compose.waitUntil(5000) { compose.onAllNodesWithText("已有其他计时，请点击「返回计时」处理当前专注或休息。").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithText("知道了").performClick()
+        } finally { runBlocking { db.taskDao().delete(other.copy(id = otherId)) } }
+        compose.onNodeWithTag("todo-list").performScrollToNode(hasTestTag("start-task-$taskId"))
         compose.onNodeWithTag("start-task-$taskId").performScrollTo().performClick()
-        compose.waitUntil(5000) { compose.onAllNodesWithText("已有计时正在进行，请先到专注页结束当前专注或休息。").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(5000) { compose.onAllNodesWithText("已暂停").fetchSemanticsNodes().isNotEmpty() }
         assertEquals(session.id, runBlocking { db.focusSessionDao().latest()!!.id })
         assertEquals(2, runBlocking { db.focusSessionDao().latest()!!.status })
-        compose.onNodeWithText("知道了").performClick()
         } finally {
             runBlocking {
                 app.container.pomodoro.finish()
@@ -134,20 +140,35 @@ class FoundationTest {
         compose.onNodeWithText("待办名称").performTextReplacement("修改后的任务")
         compose.onNodeWithText("保存").performClick()
         compose.waitUntil(5_000) { compose.onAllNodesWithText("修改后的任务").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNode(isToggleable()).performClick()
+        val editedId = runBlocking { ApplicationProvider.getApplicationContext<FocusTraceApplication>()
+            .container.database.taskDao().getAll().first().first { it.title == "修改后的任务" }.id }
+        compose.onNodeWithTag("complete-task-$editedId").performClick()
         compose.waitUntil(5_000) { compose.onAllNodesWithText("已完成").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("删除").performClick()
+        compose.onNodeWithTag("delete-task-$editedId").performClick()
         compose.onNodeWithText("取消").performClick()
         compose.onNodeWithText("修改后的任务").assertIsDisplayed()
-        compose.onNodeWithText("删除").performClick()
+        compose.onNodeWithTag("delete-task-$editedId").performClick()
         compose.onNodeWithText("确认删除").performClick()
         compose.waitUntil(5_000) { compose.onAllNodesWithText("修改后的任务").fetchSemanticsNodes().isEmpty() }
     }
 
+    private fun enterRunningFocus(type: Int = 0) {
+        val app = ApplicationProvider.getApplicationContext<FocusTraceApplication>()
+        runBlocking {
+            app.container.lifecycle.awaitEvents()
+            app.container.pomodoro.finish()
+            if (type == 1) app.container.pomodoro.startStopwatch(null)
+            else app.container.pomodoro.start(null, 1500, 300, false, false)
+        }
+        openRunningFocus()
+    }
+    private fun openRunningFocus() {
+        compose.waitUntil(5000) { compose.onAllNodes(hasText("返回计时", substring = true)).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNode(hasText("返回计时", substring = true)).performClick()
+    }
+
     @Test fun pomodoroUiPauseResumeAndFinish() {
-        compose.onAllNodesWithText("专注").onFirst().performClick()
-        compose.waitUntil(5_000) { compose.onAllNodesWithText("开始番茄钟").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("开始番茄钟").performScrollTo().performClick()
+        enterRunningFocus()
         compose.waitUntil(5_000) { compose.onAllNodesWithText("暂停").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("暂停").performScrollTo().performClick()
         compose.waitUntil(5_000) { compose.onAllNodesWithText("已暂停").fetchSemanticsNodes().isNotEmpty() }
@@ -160,11 +181,7 @@ class FoundationTest {
     }
 
     @Test fun stopwatchUiModePauseAndFinish() {
-        compose.onAllNodesWithText("专注").onFirst().performClick()
-        compose.waitUntil(5_000) { compose.onAllNodesWithText("正向计时").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("正向计时").performScrollTo().performClick()
-        compose.onNodeWithText("专注分钟").assertDoesNotExist()
-        compose.onNodeWithText("开始正向计时").performScrollTo().performClick()
+        enterRunningFocus(1)
         compose.waitUntil(5_000) { compose.onAllNodesWithText("暂停").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("暂停").performScrollTo().performClick()
         compose.waitUntil(5_000) { compose.onAllNodesWithText("继续").fetchSemanticsNodes().isNotEmpty() }
@@ -180,7 +197,7 @@ class FoundationTest {
         val app = ApplicationProvider.getApplicationContext<FocusTraceApplication>()
         val original = runBlocking { app.container.settingsRepository.settings.first() }
         try {
-            compose.onAllNodesWithText("专注").onFirst().performClick()
+            enterRunningFocus()
             compose.waitUntil(5_000) { compose.onAllNodesWithText("分心判定：${original.distractionThreshold} 秒").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithText("分心判定：${original.distractionThreshold} 秒").performScrollTo().performClick()
             compose.onNodeWithText("宽松 · 10 秒").performClick()
@@ -192,7 +209,7 @@ class FoundationTest {
             compose.activityRule.scenario.recreate()
             compose.onNodeWithText("分心判定：10 秒").performScrollTo().assertIsDisplayed()
             assertEquals(10, runBlocking { app.container.settingsRepository.settings.first().distractionThreshold })
-        } finally { runBlocking { app.container.settingsRepository.update(original) } }
+        } finally { runBlocking { app.container.pomodoro.finish(); app.container.settingsRepository.update(original) } }
     }
 
     @Test fun reportDisplaysPersistedMetricsAndSurvivesRecreation() {
@@ -209,9 +226,8 @@ class FoundationTest {
             id
         }
         try {
-            compose.onAllNodesWithText("专注").onFirst().performClick()
             compose.waitUntil(5000) { compose.onAllNodesWithText("查看专注报告").fetchSemanticsNodes().isNotEmpty() }
-            compose.onNodeWithText("查看专注报告").performScrollTo().performClick()
+            compose.onNodeWithText("查看专注报告").performClick()
             compose.waitUntil(5000) { compose.onAllNodesWithText("报告样例").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("report-list").performScrollToNode(hasTestTag("report-focus-percent"))
             compose.onNodeWithTag("report-focus-percent").assertTextEquals("88%")
@@ -221,8 +237,8 @@ class FoundationTest {
             compose.onNodeWithText("专注报告").assertIsDisplayed()
             compose.onNodeWithTag("report-list").performScrollToNode(hasTestTag("report-focus-percent"))
             compose.onNodeWithTag("report-focus-percent").assertTextEquals("88%")
-            compose.onNodeWithText("返回专注").performClick()
-            compose.onNodeWithText("查看专注报告").performScrollTo().assertIsDisplayed()
+            compose.onNodeWithText("返回待办").performClick()
+            compose.onNodeWithText("查看专注报告").assertIsDisplayed()
         } finally {
             runBlocking { db.focusSessionDao().getSession(sessionId)?.let { db.focusSessionDao().delete(it) } }
         }
@@ -230,16 +246,17 @@ class FoundationTest {
 
     @Test fun naturalCompletionOpensReportAndKeepsRestRunning() {
         val app = ApplicationProvider.getApplicationContext<FocusTraceApplication>()
-        compose.onAllNodesWithText("专注").onFirst().performClick()
         runBlocking {
             app.container.lifecycle.awaitEvents()
             app.container.pomodoro.finish()
-            app.container.pomodoro.start(null, 4, 60, true, false)
+            app.container.pomodoro.start(null, 8, 60, true, false)
         }
         try {
-            compose.waitUntil(10000) { compose.onAllNodesWithText("专注报告").fetchSemanticsNodes().isNotEmpty() }
+            openRunningFocus()
+            compose.waitUntil(15000) { compose.onAllNodesWithText("专注报告").fetchSemanticsNodes().isNotEmpty() }
             compose.waitUntil(5000) { compose.onAllNodesWithText("本轮专注完成").fetchSemanticsNodes().isNotEmpty() }
-            compose.onNodeWithText("返回专注").performClick()
+            compose.onNodeWithText("返回待办").performClick()
+            openRunningFocus()
             compose.onNodeWithText("正在休息").assertIsDisplayed()
             compose.onNodeWithText("查看专注报告").assertIsDisplayed()
         } finally { runBlocking { app.container.pomodoro.finish() } }

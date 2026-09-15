@@ -1,7 +1,7 @@
 package com.focustrace.ui.focus
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.activity.compose.BackHandler
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -18,13 +18,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.focustrace.ui.components.*
 
 @Composable
-fun FocusHomeScreen(viewModel: FocusViewModel, onReport: (Long) -> Unit) {
+fun FocusHomeScreen(viewModel: FocusViewModel, onExit: () -> Unit, onReport: (Long) -> Unit) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    var stopwatch by rememberSaveable { mutableStateOf(false) }
-    var minutes by rememberSaveable { mutableStateOf<String?>(null) }
-    var rest by rememberSaveable { mutableStateOf<String?>(null) }
-    var taskId by rememberSaveable { mutableStateOf<Long?>(null) }
-    var chooseTask by remember { mutableStateOf(false) }
     var showDistractions by rememberSaveable { mutableStateOf(false) }
     var showThreshold by rememberSaveable { mutableStateOf(false) }
     var confirmEnd by rememberSaveable { mutableStateOf(false) }
@@ -37,7 +32,9 @@ fun FocusHomeScreen(viewModel: FocusViewModel, onReport: (Long) -> Unit) {
             onReport(s.id)
         }
     }
+    BackHandler(onBack = onExit)
     BasePage("专注", "一次只做一件事") {
+        TextButton(onClick = onExit) { Text("返回待办") }
         state.lifecycleError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         if (!state.ready) CircularProgressIndicator()
@@ -58,51 +55,12 @@ fun FocusHomeScreen(viewModel: FocusViewModel, onReport: (Long) -> Unit) {
             if (s.endTime != null) OutlinedButton(onClick = { onReport(s.id) }) { Text("查看专注报告") }
             TextButton(onClick = { showDistractions = true }) { Text("分心 ${s.distractionCount} 次 · ${s.distractionSeconds} 秒 · 查看记录") }
         } else if (state.ready) {
-            if (s?.status == 4) {
-                OutlinedButton(onClick = { onReport(s.id) }) { Text("查看专注报告") }
-                InfoCard(if (s.type == 0 && s.focusSeconds >= s.plannedSeconds) "本轮专注完成" else "本轮已结束", "已专注 ${s.focusSeconds / 60} 分 ${s.focusSeconds % 60} 秒 · 记录已保存")
-                if (s.type == 0 && s.focusSeconds >= s.plannedSeconds) OutlinedButton(onClick = viewModel::rest, enabled = !state.busy) { Text("开始休息") }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                FilterChip(selected = !stopwatch, onClick = { stopwatch = false }, label = { Text("番茄钟") })
-                FilterChip(selected = stopwatch, onClick = { stopwatch = true }, label = { Text("正向计时") })
-            }
-            TextButton(onClick = { showThreshold = true }, enabled = !state.busy) { Text("分心判定：${state.settings.distractionThreshold} 秒") }
-            if (s?.status == 4) TextButton(onClick = { showDistractions = true }) { Text("分心 ${s.distractionCount} 次 · ${s.distractionSeconds} 秒 · 查看记录") }
-            val focusValue = minutes ?: state.settings.pomodoroMinutes.toString()
-            val restValue = rest ?: state.settings.breakMinutes.toString()
-            TraceCard {
-                Column(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(if (stopwatch) "从零开始，专心投入" else "准备好，开始专注", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(if (stopwatch) "00:00" else "${focusValue.toIntOrNull()?.coerceIn(0, 1440) ?: 0}:00",
-                        style = MaterialTheme.typography.displaySmall.copy(fontSize = 44.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Light),
-                        color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(vertical = 8.dp))
-                }
-                if (!stopwatch) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        OutlinedTextField(value = focusValue, onValueChange = { minutes = it.take(5) }, label = { Text("专注分钟") },
-                            modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true)
-                        OutlinedTextField(value = restValue, onValueChange = { rest = it.take(5) }, label = { Text("休息分钟") },
-                            modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true)
-                    }
-                    Text("时长范围：1–1440 分钟", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                } else Text("从 00:00 开始，直到你主动结束。", style = MaterialTheme.typography.bodyMedium)
-            }
-            Box {
-                OutlinedButton(onClick = { chooseTask = true }) { Text(state.tasks.firstOrNull { it.id == taskId }?.title ?: "自由专注（选择待办）") }
-                DropdownMenu(expanded = chooseTask, onDismissRequest = { chooseTask = false }) {
-                    DropdownMenuItem(text = { Text("自由专注") }, onClick = { taskId = null; chooseTask = false })
-                    state.tasks.filter { !it.completed }.forEach { task ->
-                        DropdownMenuItem(text = { Text(task.title) }, onClick = { taskId = task.id; stopwatch = task.timerType == 1; minutes = task.targetMinutes.toString(); chooseTask = false })
-                    }
-                }
-            }
-            Button(modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp), enabled = !state.busy && (stopwatch || (focusValue.toIntOrNull() in 1..1440 && restValue.toIntOrNull() in 1..1440)),
-                onClick = {
-                    val selected = taskId?.takeIf { id -> state.tasks.any { it.id == id } }
-                    if (stopwatch) viewModel.startStopwatch(selected) else viewModel.start(selected, focusValue.toInt(), restValue.toInt())
-                }) { Text(if (stopwatch) "开始正向计时" else "开始番茄钟") }
+            if (s != null && s.endTime != null) {
+                InfoCard("本轮已结束", "专注记录已保存")
+                Button(onClick = { onReport(s.id) }) { Text("查看专注报告") }
+            } else Text("当前没有进行中的计时，请返回待办选择任务开始。")
         }
+        TextButton(onClick = { showThreshold = true }, enabled = !state.busy) { Text("分心判定：${state.settings.distractionThreshold} 秒") }
     }
     if (showDistractions) DistractionHistoryDialog(state.distractions) { showDistractions = false }
     if (showThreshold) DistractionThresholdDialog(state.settings.distractionThreshold, onDismiss = { showThreshold = false },

@@ -24,7 +24,6 @@ import com.focustrace.ui.statistics.*
 import com.focustrace.ui.settings.*
 private enum class Tab(val route: String, val label: String, val icon: ImageVector) {
     TODO("todo", "待办", Icons.Outlined.CheckCircle),
-    FOCUS("focus", "专注", Icons.Outlined.Timer),
     STATISTICS("statistics", "统计", Icons.Outlined.BarChart),
     PROFILE("profile", "我的", Icons.Outlined.Person)
 }
@@ -33,7 +32,7 @@ fun AppNavigation(container: AppContainer) {
     val controller = rememberNavController()
     val entry by controller.currentBackStackEntryAsState()
     Scaffold(bottomBar = {
-        if (entry?.destination?.route != "report/{sessionId}") NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
+        if (entry?.destination?.route != "report/{sessionId}" && entry?.destination?.route != "focus") NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
             Tab.entries.forEach { tab ->
                 NavigationBarItem(colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = MaterialTheme.colorScheme.primary,
@@ -54,23 +53,23 @@ fun AppNavigation(container: AppContainer) {
         Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
             NavHost(controller, startDestination = Tab.TODO.route, modifier = Modifier.widthIn(max = 640.dp).fillMaxSize()) {
                 composable(Tab.TODO.route) {
-                    TodoScreen(viewModel(factory = viewModelFactory { initializer { TodoViewModel(container) } })) {
-                        controller.navigate(Tab.FOCUS.route) {
+                    TodoScreen(viewModel(factory = viewModelFactory { initializer { TodoViewModel(container) } }), onReport = { id -> controller.navigate("report/$id") }) {
+                        controller.navigate("focus") {
                             popUpTo(controller.graph.findStartDestination().id) { saveState = true }
                             launchSingleTop = true
                             restoreState = true
                         }
                     }
                 }
-                composable(Tab.FOCUS.route) {
-                    FocusHomeScreen(viewModel(factory = viewModelFactory { initializer { FocusViewModel(container) } })) { id ->
+                composable("focus") {
+                    FocusHomeScreen(viewModel(factory = viewModelFactory { initializer { FocusViewModel(container) } }), onExit = { controller.popBackStack("todo", false) }) { id ->
                         controller.navigate("report/$id") { launchSingleTop = true }
                     }
                 }
                 composable("report/{sessionId}", arguments = listOf(navArgument("sessionId") { type = NavType.LongType })) { reportEntry ->
                     val sessionId = reportEntry.arguments!!.getLong("sessionId")
                     FocusResultScreen(viewModel(factory = viewModelFactory { initializer { FocusResultViewModel(container.focusRepository, sessionId) } })) {
-                        controller.popBackStack()
+                        controller.popBackStack("todo", false)
                     }
                 }
                 composable(Tab.STATISTICS.route) {

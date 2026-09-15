@@ -1,6 +1,7 @@
 package com.focustrace.ui.focus
 
 import androidx.compose.foundation.layout.*
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
@@ -19,10 +20,11 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun FocusResultScreen(viewModel: FocusResultViewModel, onBack: () -> Unit) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    BackHandler(onBack = onBack)
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("专注报告", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
-            TextButton(onClick = onBack) { Text("返回专注") }
+            TextButton(onClick = onBack) { Text("返回待办") }
         }
         when (val current = state) {
             LoadState.Loading -> CircularProgressIndicator(Modifier.padding(24.dp))
