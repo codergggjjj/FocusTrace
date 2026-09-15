@@ -20,6 +20,43 @@ import org.junit.runner.RunWith
 class FoundationTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
 
+    @Test fun realScreenOffDoesNotCreateDistraction() {
+        val app = ApplicationProvider.getApplicationContext<FocusTraceApplication>()
+        val container = app.container
+        val automation = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation
+        fun shell(command: String) {
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand(command)).use { it.readBytes() }
+        }
+        compose.waitForIdle()
+        val session = runBlocking {
+            container.lifecycle.awaitEvents()
+            container.pomodoro.startStopwatch(null)
+            container.pomodoro.refresh()!!
+        }
+        try {
+            shell("input keyevent 223") // Actual device sleep, not a simulated app callback.
+            android.os.SystemClock.sleep(4500)
+            assertFalse(app.getSystemService(android.os.PowerManager::class.java).isInteractive)
+            shell("input keyevent 224")
+            shell("wm dismiss-keyguard")
+            android.os.SystemClock.sleep(1500)
+            runBlocking {
+                container.lifecycle.awaitEvents()
+                val current = container.pomodoro.refresh()!!
+                assertEquals(0, current.distractionCount)
+                assertNull(current.backgroundWall)
+                assertTrue(container.pomodoro.elapsed(current) >= 4500)
+            }
+        } finally {
+            shell("input keyevent 224")
+            shell("wm dismiss-keyguard")
+            runBlocking {
+                container.lifecycle.awaitEvents()
+                container.database.focusSessionDao().getSession(session.id)?.let { container.database.focusSessionDao().delete(it) }
+            }
+        }
+    }
+
     @Test fun threeTabsNavigateAndSurviveRecreation() {
         compose.onNodeWithText("把注意力留给重要的事").assertIsDisplayed()
         compose.onNodeWithText("专注").assertDoesNotExist()

@@ -16,7 +16,7 @@ class FocusLifecycleCoordinator(
     private val clock: TimerClock
 ) {
     private sealed interface Event {
-        data class Transition(val foreground: Boolean, val at: TimerInstant) : Event
+        data class Transition(val foreground: Boolean, val exempt: Boolean, val at: TimerInstant) : Event
         data class Barrier(val done: CompletableDeferred<Unit>) : Event
     }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -32,7 +32,8 @@ class FocusLifecycleCoordinator(
                 var threshold: Int? = null
                 while (isActive) {
                     try {
-                        if (event.foreground) engine.onForeground(event.at)
+                        if (event.exempt) engine.onScreenExempt(event.at)
+                        else if (event.foreground) engine.onForeground(event.at)
                         else {
                             val seconds = threshold ?: settings.settings.first().distractionThreshold.also { threshold = it }
                             engine.onBackground(seconds, event.at)
@@ -48,8 +49,9 @@ class FocusLifecycleCoordinator(
             }
         }
     }
-    fun onBackground() { events.trySend(Event.Transition(false, clock.snapshot())) }
-    fun onForeground() { events.trySend(Event.Transition(true, clock.snapshot())) }
+    fun transition(foreground: Boolean, exempt: Boolean) {
+        events.trySend(Event.Transition(foreground, exempt, clock.snapshot()))
+    }
 
     /** UI actions must not overtake a queued return-to-foreground event. */
     suspend fun awaitEvents() {

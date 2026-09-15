@@ -19,6 +19,51 @@ class DistractionTest {
     @get:Rule val migration = MigrationTestHelper(InstrumentationRegistry.getInstrumentation(), FocusTraceDatabase::class.java, emptyList())
     private fun database() = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), FocusTraceDatabase::class.java).build()
 
+    @Test fun screenOffCountsAsFocusAndUnlockOutsideResumesDistraction() = runBlocking {
+        val db = database()
+        try {
+            val clock = PomodoroTest.Clock()
+            val engine = PomodoroEngine(db, clock)
+            engine.startStopwatch(null)
+            clock.advance(5000)
+            engine.onScreenExempt()
+            clock.advance(60000)
+            engine.onScreenExempt() // Screen on, still locked.
+            clock.advance(10000)
+            engine.onForeground()
+            assertEquals(75000L, engine.elapsed(engine.refresh()!!))
+            assertEquals(0, engine.refresh()!!.distractionCount)
+            engine.onBackground(3)
+            clock.advance(5000)
+            engine.onScreenExempt() // Only the preceding unlocked absence counts.
+            clock.advance(30000)
+            engine.onBackground(3) // Unlocked into another app.
+            clock.advance(4000)
+            engine.onForeground()
+            val session = engine.refresh()!!
+            assertEquals(105000L, engine.elapsed(session))
+            assertEquals(2, session.distractionCount)
+            assertEquals(9L, session.distractionSeconds)
+        } finally { db.close() }
+    }
+
+    @Test fun pomodoroCompletesDuringScreenOffWithoutStartingNextRound() = runBlocking {
+        val db = database()
+        try {
+            val clock = PomodoroTest.Clock()
+            val engine = PomodoroEngine(db, clock)
+            engine.start(null, 60, 10, true, true)
+            engine.onScreenExempt()
+            clock.advance(90000)
+            val session = engine.refresh()!!
+            assertEquals(3, session.status)
+            assertEquals(60L, session.focusSeconds)
+            assertEquals(0, session.distractionCount)
+            engine.onForeground()
+            assertNotEquals(session.id, engine.refresh()!!.id)
+        } finally { db.close() }
+    }
+
     @Test fun thresholdBoundariesAndRepeatedCallbacks() = runBlocking {
         val db = database()
         try {

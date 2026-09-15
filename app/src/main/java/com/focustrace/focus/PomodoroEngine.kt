@@ -83,6 +83,14 @@ class PomodoroEngine(private val db: FocusTraceDatabase, private val clock: Time
                 backgroundThresholdMillis = thresholdSeconds * 1000L), at))
         }
     }
+    /** Screen-off/lock time counts as focus, but does not start another round in background. */
+    suspend fun onScreenExempt(at: TimerInstant = clock.snapshot()): Unit = lock.withLock {
+        db.withTransaction {
+            foreground = false
+            settleDeparture(at)
+            advance(at)
+        }
+    }
     suspend fun onForeground(at: TimerInstant = clock.snapshot()): Unit = lock.withLock {
         db.withTransaction {
             foreground = true
