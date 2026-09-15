@@ -15,6 +15,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.focustrace.ui.components.*
 
@@ -53,19 +57,23 @@ fun TodoScreen(viewModel: TodoViewModel, onReport: (Long) -> Unit, onStarted: ()
             if (tasks.isEmpty()) InfoCard("给重要的事留一点时间", "还没有待办，给今天留一点专注的空间。")
             LazyColumn(Modifier.testTag("todo-list"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 items(tasks, key = { it.id }) { task ->
-                    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+                    Card(Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
                         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                             Checkbox(modifier = Modifier.testTag("complete-task-${task.id}"), checked = task.completed, onCheckedChange = { viewModel.toggle(task) }, enabled = !busy)
-                            Column(Modifier.weight(1f).clickable(enabled = !busy) { editingId = task.id; editorOpen = true }) {
-                                Text(task.title, style = MaterialTheme.typography.titleMedium, textDecoration = if (task.completed) TextDecoration.LineThrough else null, color = if (task.completed) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
+                            Column(Modifier.weight(1f).clickable(enabled = !busy) { editingId = task.id; editorOpen = true }, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(task.title, style = MaterialTheme.typography.titleLarge.copy(fontSize = 24.sp, lineHeight = 32.sp, fontWeight = FontWeight.Bold), textDecoration = if (task.completed) TextDecoration.LineThrough else null, color = if (task.completed) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
                                 Text("${data.categories.firstOrNull { it.id == task.categoryId }?.name ?: "未分类"} · ${if (task.timerType == 1) "正向计时" else "番茄钟 · ${task.targetMinutes} 分钟"}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 if (task.completed) Text("已完成")
                             }
-                            TextButton(modifier = Modifier.testTag("delete-task-${task.id}"), onClick = { deletingId = task.id }, enabled = !busy) { Text("删除") }
+                            TextButton(modifier = Modifier.testTag("delete-task-${task.id}"), onClick = { deletingId = task.id }, enabled = !busy, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)) { Text("删除") }
                         }
                         if (!task.completed) {
                             Button(onClick = { viewModel.start(task.id, onStarted) }, enabled = !busy,
-                                modifier = Modifier.testTag("start-task-${task.id}").align(Alignment.End).padding(end = 12.dp, bottom = 12.dp)) { Text("开始") }
+                                modifier = Modifier.testTag("start-task-${task.id}").align(Alignment.End).padding(end = 12.dp, bottom = 12.dp)) {
+                                    Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("开始")
+                                }
                         }
                     }
                 }

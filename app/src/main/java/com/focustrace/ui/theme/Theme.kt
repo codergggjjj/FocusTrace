@@ -12,31 +12,31 @@ import androidx.compose.ui.unit.sp
 import com.focustrace.data.datastore.ThemeMode
 
 private val LightColors = lightColorScheme(
-    primary = Color(0xFFAE483C), onPrimary = Color.White,
-    primaryContainer = Color(0xFFFBE8E3), onPrimaryContainer = Color(0xFF762C23),
-    secondary = Color(0xFF596657), onSecondary = Color.White,
-    secondaryContainer = Color(0xFFE6EBE2), onSecondaryContainer = Color(0xFF354231),
-    tertiary = Color(0xFF795B36), onTertiary = Color.White,
-    tertiaryContainer = Color(0xFFF5E9D7), onTertiaryContainer = Color(0xFF523C21),
-    background = Color(0xFFF7F6F2), onBackground = Color(0xFF292724),
-    surface = Color(0xFFFFFEFB), onSurface = Color(0xFF292724),
-    surfaceVariant = Color(0xFFEFEBE5), onSurfaceVariant = Color(0xFF6E675F),
-    surfaceTint = Color(0xFFFFFEFB),
-    outline = Color(0xFF8B8278), outlineVariant = Color(0xFFE3DED6),
+    primary = Color(0xFFC93469), onPrimary = Color.White,
+    primaryContainer = Color(0xFFFFE4ED), onPrimaryContainer = Color(0xFF8D1946),
+    secondary = Color(0xFF087DA4), onSecondary = Color.White,
+    secondaryContainer = Color(0xFFDDF3FC), onSecondaryContainer = Color(0xFF075571),
+    tertiary = Color(0xFF7854AA), onTertiary = Color.White,
+    tertiaryContainer = Color(0xFFEFE6FB), onTertiaryContainer = Color(0xFF523476),
+    background = Color(0xFFF6F7FB), onBackground = Color(0xFF242632),
+    surface = Color(0xFFFFFFFF), onSurface = Color(0xFF242632),
+    surfaceVariant = Color(0xFFEEF0F6), onSurfaceVariant = Color(0xFF656B7B),
+    surfaceTint = Color(0xFFFFFFFF),
+    outline = Color(0xFF858C9D), outlineVariant = Color(0xFFE7EAF2),
     error = Color(0xFFBA1A1A), onError = Color.White
 )
 private val DarkColors = darkColorScheme(
-    primary = Color(0xFFFFB4A6), onPrimary = Color(0xFF65251D),
-    primaryContainer = Color(0xFF54312C), onPrimaryContainer = Color(0xFFFFDAD2),
-    secondary = Color(0xFFBDCDB5), onSecondary = Color(0xFF293624),
-    secondaryContainer = Color(0xFF374332), onSecondaryContainer = Color(0xFFD9E7D0),
-    tertiary = Color(0xFFE7C393), onTertiary = Color(0xFF432D10),
-    tertiaryContainer = Color(0xFF584328), onTertiaryContainer = Color(0xFFFFDDB0),
-    background = Color(0xFF191817), onBackground = Color(0xFFEAE3DB),
-    surface = Color(0xFF22201E), onSurface = Color(0xFFEAE3DB),
-    surfaceVariant = Color(0xFF302D29), onSurfaceVariant = Color(0xFFC3BAB0),
-    surfaceTint = Color(0xFF22201E),
-    outline = Color(0xFF938A80), outlineVariant = Color(0xFF49443E)
+    primary = Color(0xFFFFADCB), onPrimary = Color(0xFF650C32),
+    primaryContainer = Color(0xFF572138), onPrimaryContainer = Color(0xFFFFD9E7),
+    secondary = Color(0xFF89D4F3), onSecondary = Color(0xFF003548),
+    secondaryContainer = Color(0xFF143E50), onSecondaryContainer = Color(0xFFC4EDFF),
+    tertiary = Color(0xFFD6BBFF), onTertiary = Color(0xFF402066),
+    tertiaryContainer = Color(0xFF493361), onTertiaryContainer = Color(0xFFECDDFF),
+    background = Color(0xFF15171E), onBackground = Color(0xFFE8EAF3),
+    surface = Color(0xFF20232D), onSurface = Color(0xFFE8EAF3),
+    surfaceVariant = Color(0xFF2B303D), onSurfaceVariant = Color(0xFFB9C0D1),
+    surfaceTint = Color(0xFF20232D),
+    outline = Color(0xFF8D96A9), outlineVariant = Color(0xFF3B4354)
 )
 private val FocusTypography = Typography(
     headlineLarge = TextStyle(fontWeight = FontWeight.Bold, fontSize = 30.sp, lineHeight = 38.sp),
