@@ -54,7 +54,13 @@ fun AppNavigation(container: AppContainer) {
         Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
             NavHost(controller, startDestination = Tab.TODO.route, modifier = Modifier.widthIn(max = 640.dp).fillMaxSize()) {
                 composable(Tab.TODO.route) {
-                    TodoScreen(viewModel(factory = viewModelFactory { initializer { TodoViewModel(container.taskRepository) } }))
+                    TodoScreen(viewModel(factory = viewModelFactory { initializer { TodoViewModel(container) } })) {
+                        controller.navigate(Tab.FOCUS.route) {
+                            popUpTo(controller.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
                 }
                 composable(Tab.FOCUS.route) {
                     FocusHomeScreen(viewModel(factory = viewModelFactory { initializer { FocusViewModel(container) } })) { id ->

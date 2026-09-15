@@ -13,12 +13,13 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.focustrace.ui.components.*
 
 @Composable
-fun TodoScreen(viewModel: TodoViewModel) {
+fun TodoScreen(viewModel: TodoViewModel, onStarted: () -> Unit) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val busy by viewModel.busy.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
@@ -44,7 +45,7 @@ fun TodoScreen(viewModel: TodoViewModel) {
             val tasks = data.tasks.filter { filter == null || it.categoryId == filter }
             Text("待完成 ${tasks.count { !it.completed }} · 已完成 ${tasks.count { it.completed }}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (tasks.isEmpty()) InfoCard("给重要的事留一点时间", "还没有待办，给今天留一点专注的空间。")
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            LazyColumn(Modifier.testTag("todo-list"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 items(tasks, key = { it.id }) { task ->
                     Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
                         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -55,6 +56,10 @@ fun TodoScreen(viewModel: TodoViewModel) {
                                 if (task.completed) Text("已完成")
                             }
                             TextButton(onClick = { deletingId = task.id }, enabled = !busy) { Text("删除") }
+                        }
+                        if (!task.completed) {
+                            Button(onClick = { viewModel.start(task.id, onStarted) }, enabled = !busy,
+                                modifier = Modifier.testTag("start-task-${task.id}").align(Alignment.End).padding(end = 12.dp, bottom = 12.dp)) { Text("开始") }
                         }
                     }
                 }

@@ -79,6 +79,43 @@ class FoundationTest {
         assertEquals(1, session.type)
         compose.onNodeWithText("结束专注").performScrollTo().performClick()
         compose.onNodeWithText("确认结束").performClick()
+        runBlocking { app.container.database.taskDao().delete(task) }
+    }
+
+    @Test fun todoStartsPomodoroDirectlyAndProtectsPausedSession() = verifyDirectTaskStart(0)
+    @Test fun todoStartsStopwatchDirectlyAndProtectsPausedSession() = verifyDirectTaskStart(1)
+
+    private fun verifyDirectTaskStart(timerType: Int) {
+        val app = ApplicationProvider.getApplicationContext<FocusTraceApplication>()
+        val db = app.container.database
+        val taskId = runBlocking {
+            app.container.lifecycle.awaitEvents()
+            app.container.pomodoro.finish()
+            db.taskDao().insert(TaskEntity(title = "一键开始验证", targetMinutes = 12,
+                timerType = timerType, createdAt = 1, updatedAt = 1))
+        }
+        try {
+        compose.onNodeWithTag("todo-list").performScrollToNode(hasTestTag("start-task-$taskId"))
+        compose.onNodeWithTag("start-task-$taskId").performScrollTo().performClick()
+        compose.waitUntil(5000) { compose.onAllNodesWithText("正在专注").fetchSemanticsNodes().isNotEmpty() }
+        val session = runBlocking { db.focusSessionDao().latest()!! }
+        assertEquals(taskId, session.taskId)
+        assertEquals(timerType, session.type)
+        assertEquals(if (timerType == 0) 720L else 0L, session.plannedSeconds)
+        compose.onNodeWithText("暂停").performScrollTo().performClick()
+        compose.waitUntil(5000) { compose.onAllNodesWithText("已暂停").fetchSemanticsNodes().isNotEmpty() }
+        compose.onAllNodesWithText("待办").onFirst().performClick()
+        compose.onNodeWithTag("start-task-$taskId").performScrollTo().performClick()
+        compose.waitUntil(5000) { compose.onAllNodesWithText("已有计时正在进行，请先到专注页结束当前专注或休息。").fetchSemanticsNodes().isNotEmpty() }
+        assertEquals(session.id, runBlocking { db.focusSessionDao().latest()!!.id })
+        assertEquals(2, runBlocking { db.focusSessionDao().latest()!!.status })
+        compose.onNodeWithText("知道了").performClick()
+        } finally {
+            runBlocking {
+                app.container.pomodoro.finish()
+                db.taskDao().getAll().first().firstOrNull { it.id == taskId }?.let { db.taskDao().delete(it) }
+            }
+        }
     }
 
     @Test fun taskCrudPersistsAndValidatesInput() {
