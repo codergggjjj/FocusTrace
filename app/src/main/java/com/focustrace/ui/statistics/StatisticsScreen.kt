@@ -5,6 +5,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import java.time.*
+import java.time.format.DateTimeFormatter
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -21,9 +24,13 @@ import com.focustrace.statistics.*
 import com.focustrace.ui.components.*
 
 @Composable
-fun StatisticsScreen(viewModel: StatisticsViewModel) {
+fun StatisticsScreen(viewModel: StatisticsViewModel, onReport: (Long) -> Unit) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val selection by viewModel.selection.collectAsStateWithLifecycle()
+    var showDate by rememberSaveable { mutableStateOf(false) }
+    if (showDate) PeriodDateDialog(selection, onDismiss = { showDate = false }) {
+        viewModel.selectDate(it); showDate = false
+    }
     LazyColumn(Modifier.fillMaxSize().testTag("statistics-list"), contentPadding = PaddingValues(20.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)) {
         item {
@@ -35,6 +42,7 @@ fun StatisticsScreen(viewModel: StatisticsViewModel) {
                     FilterChip(selected = selection.period == period, onClick = { viewModel.choose(period) }, label = { Text(period.label) })
                 }
             }
+            TextButton(onClick = { showDate = true }) { Text(if (selection.period == StatisticsPeriod.MONTH) "选择月份" else "选择日期") }
             Text(if (selection.period == StatisticsPeriod.DAY) selection.range.start.toString()
                 else "${selection.range.start} 至 ${selection.range.endExclusive.minusDays(1)}",
                 modifier = Modifier.testTag("statistics-range"))
@@ -56,8 +64,8 @@ fun StatisticsScreen(viewModel: StatisticsViewModel) {
                     val totals = summary.totals
                     TraceCard {
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text("专注概览", style = MaterialTheme.typography.titleLarge)
-                            Text(formatDuration(totals.focusSeconds), style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
+                            Text("累计学习时间", style = MaterialTheme.typography.titleLarge)
+                            Text(formatDuration(totals.focusSeconds), modifier = Modifier.testTag("study-total"), style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
                             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                                 SummaryMetric("专注次数", "${totals.sessions} 次", Modifier.weight(1f))
@@ -74,6 +82,22 @@ fun StatisticsScreen(viewModel: StatisticsViewModel) {
                     }
                 }
                 if (summary.totals.sessions == 0) item { Text("这段时间暂无已结束的专注记录，完成一次专注后再来看看。") }
+                item {
+                    Text("学习记录 · ${summary.sessions.size} 次", style = MaterialTheme.typography.titleLarge)
+                    Text("累计时间为有效专注时长；起止区间可能包含暂停和分心。", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                items(summary.sessions, key = { "session-${it.id}" }) { session ->
+                    val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(summary.range.zone)
+                    TraceCard(Modifier.testTag("study-session-${session.id}").clickable { onReport(session.id) }) {
+                        Text(session.taskTitleSnapshot ?: "自由专注 / 原待办不可用", style = MaterialTheme.typography.titleMedium)
+                        Text("开始：${formatter.format(Instant.ofEpochMilli(session.startTime))}")
+                        Text("结束：${formatter.format(Instant.ofEpochMilli(session.endTime!!))}")
+                        Text("${if (session.type == 0) "番茄钟" else "正向计时"} · 有效学习 ${formatDuration(session.focusSeconds)}",
+                            color = MaterialTheme.colorScheme.primary)
+                        Text("查看本次报告", style = MaterialTheme.typography.labelLarge)
+                    }
+                }
                 item { DailyChart(summary) }
                 item {
                     Text("分类统计", style = MaterialTheme.typography.titleLarge)
@@ -139,4 +163,20 @@ private fun SummaryMetric(label: String, value: String, modifier: Modifier) {
         Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(value, style = MaterialTheme.typography.titleLarge)
     }
+}
+
+@Composable
+private fun PeriodDateDialog(selection: StatisticsSelection, onDismiss: () -> Unit, onConfirm: (LocalDate) -> Unit) {
+    val month = selection.period == StatisticsPeriod.MONTH
+    var input by rememberSaveable { mutableStateOf(if (month) YearMonth.from(selection.range.start).toString() else selection.range.start.toString()) }
+    val date = runCatching { if (month) YearMonth.parse(input.trim()).atDay(1) else LocalDate.parse(input.trim()) }.getOrNull()
+    val valid = date != null && date <= LocalDate.now()
+    AlertDialog(onDismissRequest = onDismiss, title = { Text(if (month) "选择月份" else "选择日期") },
+        text = {
+            OutlinedTextField(value = input, onValueChange = { input = it.take(10) }, singleLine = true,
+                label = { Text(if (month) "月份（yyyy-MM）" else "日期（yyyy-MM-dd）") },
+                isError = !valid, supportingText = { Text(if (month) "例如 2026-09，不可选择未来月份" else "例如 2026-09-15，不可选择未来日期") })
+        },
+        confirmButton = { TextButton(enabled = valid, onClick = { date?.let(onConfirm) }) { Text("查看") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } })
 }

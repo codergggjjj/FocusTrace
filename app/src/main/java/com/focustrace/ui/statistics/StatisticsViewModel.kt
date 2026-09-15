@@ -30,6 +30,9 @@ class StatisticsViewModel(repository: StatisticsRepository, private val savedSta
         repository.statistics(range).asLoadState().onStart { emit(LoadState.Loading) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), LoadState.Loading)
     fun choose(period: StatisticsPeriod) { savedState["statisticsAnchor"] = null; savedState["statisticsPeriod"] = period.name }
+    fun selectDate(date: LocalDate) {
+        if (date <= LocalDate.now()) savedState["statisticsAnchor"] = date.toEpochDay()
+    }
     fun current() { savedState["statisticsAnchor"] = null }
     fun shift(direction: Int) {
         if (direction > 0 && !selection.value.canNext) return

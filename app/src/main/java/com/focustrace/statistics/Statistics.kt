@@ -27,7 +27,7 @@ data class StatisticsTotals(val focusSeconds: Long, val sessions: Int, val pomod
 data class DailyStatistics(val date: LocalDate, val totals: StatisticsTotals)
 data class CategoryStatistics(val id: Long?, val name: String, val focusSeconds: Long, val sessions: Int)
 data class StatisticsSummary(val range: StatisticsRange, val totals: StatisticsTotals,
-    val days: List<DailyStatistics>, val categories: List<CategoryStatistics>)
+    val days: List<DailyStatistics>, val categories: List<CategoryStatistics>, val sessions: List<com.focustrace.data.local.entity.FocusSessionEntity>)
 
 fun summarizeStatistics(records: List<StatisticsRecord>, range: StatisticsRange): StatisticsSummary {
     val eligible = records.filter { it.session.endTime != null && it.session.status in listOf(3, 4) && it.session.startTime >= range.startMillis && it.session.startTime < range.endMillis }
@@ -51,5 +51,5 @@ fun summarizeStatistics(records: List<StatisticsRecord>, range: StatisticsRange)
     val categories = eligible.groupBy { it.task?.category?.id }.map { (id, rows) ->
         CategoryStatistics(id, rows.first().task?.category?.name ?: "未分类 / 自由专注", rows.sumOf { it.session.focusSeconds.coerceAtLeast(0) }, rows.size)
     }.sortedWith(compareByDescending<CategoryStatistics> { it.focusSeconds }.thenBy { it.name })
-    return StatisticsSummary(range, totals(eligible), days, categories)
+    return StatisticsSummary(range, totals(eligible), days, categories, eligible.map { it.session }.sortedWith(compareByDescending<com.focustrace.data.local.entity.FocusSessionEntity> { it.startTime }.thenByDescending { it.id }))
 }

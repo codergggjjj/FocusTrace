@@ -33,6 +33,48 @@ class FoundationTest {
         compose.onNodeWithText("把注意力留给重要的事").assertIsDisplayed()
     }
 
+    @Test fun studyDateMonthTotalsAndSessionTimesOpenReport() {
+        val db = ApplicationProvider.getApplicationContext<FocusTraceApplication>().container.database
+        val zone = java.time.ZoneId.systemDefault()
+        fun instant(day: Int, hour: Int) = java.time.LocalDate.of(2024, 6, day).atTime(hour, 0).atZone(zone).toInstant().toEpochMilli()
+        val firstId = runBlocking { db.focusSessionDao().insert(FocusSessionEntity(type = 1, startTime = instant(12, 22),
+            endTime = instant(13, 0), plannedSeconds = 0, focusSeconds = 3600, status = 4, taskTitleSnapshot = "晚间学习")) }
+        val secondId = runBlocking { db.focusSessionDao().insert(FocusSessionEntity(type = 0, startTime = instant(14, 10),
+            endTime = instant(14, 11), plannedSeconds = 1800, focusSeconds = 1800, status = 4, taskTitleSnapshot = "上午学习")) }
+        try {
+            compose.onAllNodesWithText("统计").onFirst().performClick()
+            compose.onNodeWithText("本月").performClick()
+            compose.onNodeWithText("选择月份").performClick()
+            compose.onNodeWithText("月份（yyyy-MM）").performTextReplacement("2024-06")
+            compose.onNodeWithText("查看").performClick()
+            compose.onNodeWithTag("statistics-list").performScrollToNode(hasTestTag("study-total"))
+            compose.waitUntil(5000) { compose.onAllNodesWithText("1 时 30 分 0 秒").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithTag("study-total").assertTextEquals("1 时 30 分 0 秒")
+            compose.onNodeWithTag("statistics-list").performScrollToNode(hasText("今日"))
+            compose.onNodeWithText("今日").performClick()
+            compose.onNodeWithText("选择日期").performClick()
+            compose.onNodeWithText("日期（yyyy-MM-dd）").performTextReplacement("2024-06-12")
+            compose.onNodeWithText("查看").performClick()
+            compose.onNodeWithTag("statistics-list").performScrollToNode(hasTestTag("study-total"))
+            compose.waitUntil(5000) { compose.onAllNodesWithText("1 时 0 分 0 秒").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithTag("study-total").assertTextEquals("1 时 0 分 0 秒")
+            compose.onNodeWithTag("statistics-list").performScrollToNode(hasTestTag("study-session-$firstId"))
+            compose.onNodeWithText("开始：2024-06-12 22:00:00").assertExists()
+            compose.onNodeWithText("结束：2024-06-13 00:00:00").assertExists()
+            compose.onNodeWithTag("study-session-$firstId").performClick()
+            compose.onNodeWithText("专注报告").assertIsDisplayed()
+            compose.activityRule.scenario.recreate()
+            compose.onNodeWithText("返回统计").performClick()
+            compose.onNodeWithTag("statistics-list").performScrollToNode(hasTestTag("statistics-range"))
+            compose.onNodeWithTag("statistics-range").assertTextEquals("2024-06-12")
+        } finally {
+            runBlocking {
+                db.focusSessionDao().getSession(firstId)?.let { db.focusSessionDao().delete(it) }
+                db.focusSessionDao().getSession(secondId)?.let { db.focusSessionDao().delete(it) }
+            }
+        }
+    }
+
     @Test fun statisticsPeriodsAndHistorySurviveRecreation() {
         compose.onAllNodesWithText("统计").onFirst().performClick()
         compose.onNodeWithText("本月").performClick()

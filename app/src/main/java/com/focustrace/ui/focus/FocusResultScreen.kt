@@ -18,13 +18,13 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 @Composable
-fun FocusResultScreen(viewModel: FocusResultViewModel, onBack: () -> Unit) {
+fun FocusResultScreen(viewModel: FocusResultViewModel, backLabel: String = "返回待办", onBack: () -> Unit) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     BackHandler(onBack = onBack)
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("专注报告", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
-            TextButton(onClick = onBack) { Text("返回待办") }
+            TextButton(onClick = onBack) { Text(backLabel) }
         }
         when (val current = state) {
             LoadState.Loading -> CircularProgressIndicator(Modifier.padding(24.dp))

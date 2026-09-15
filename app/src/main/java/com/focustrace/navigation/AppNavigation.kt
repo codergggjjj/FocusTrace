@@ -68,12 +68,15 @@ fun AppNavigation(container: AppContainer) {
                 }
                 composable("report/{sessionId}", arguments = listOf(navArgument("sessionId") { type = NavType.LongType })) { reportEntry ->
                     val sessionId = reportEntry.arguments!!.getLong("sessionId")
-                    FocusResultScreen(viewModel(factory = viewModelFactory { initializer { FocusResultViewModel(container.focusRepository, sessionId) } })) {
-                        controller.popBackStack("todo", false)
+                    val fromStatistics = controller.previousBackStackEntry?.destination?.route == Tab.STATISTICS.route
+                    FocusResultScreen(viewModel(factory = viewModelFactory { initializer { FocusResultViewModel(container.focusRepository, sessionId) } }), backLabel = if (fromStatistics) "返回统计" else "返回待办") {
+                        if (fromStatistics) controller.popBackStack() else controller.popBackStack("todo", false)
                     }
                 }
                 composable(Tab.STATISTICS.route) {
-                    StatisticsScreen(viewModel(factory = viewModelFactory { initializer { StatisticsViewModel(container.statisticsRepository, createSavedStateHandle()) } }))
+                    StatisticsScreen(viewModel(factory = viewModelFactory { initializer { StatisticsViewModel(container.statisticsRepository, createSavedStateHandle()) } })) { id ->
+                        controller.navigate("report/$id") { launchSingleTop = true }
+                    }
                 }
                 composable(Tab.PROFILE.route) {
                     ProfileScreen(viewModel(factory = viewModelFactory { initializer { SettingsViewModel(container.settingsRepository) } }))
