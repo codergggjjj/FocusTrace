@@ -80,7 +80,7 @@ fun TodoScreen(viewModel: TodoViewModel, onReport: (Long) -> Unit, onStarted: ()
             }
             if (editorOpen) {
                 val original = data.tasks.firstOrNull { it.id == editingId }
-                TaskEditScreen(original, data.categories, busy,
+                TaskEditScreen(original, data.categories, busy, data.defaultMinutes,
                     onDismiss = { editorOpen = false },
                     onSave = { title, minutes, category, timerType -> viewModel.save(original, title, minutes, category, timerType) { editorOpen = false } })
             }

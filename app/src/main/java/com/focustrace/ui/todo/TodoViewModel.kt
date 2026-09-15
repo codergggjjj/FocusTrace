@@ -7,7 +7,7 @@ import com.focustrace.ui.components.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
-data class TodoData(val tasks: List<TaskEntity>, val categories: List<CategoryEntity>, val activeSession: FocusSessionEntity?, val reportId: Long?)
+data class TodoData(val tasks: List<TaskEntity>, val categories: List<CategoryEntity>, val activeSession: FocusSessionEntity?, val reportId: Long?, val defaultMinutes: Int)
 class TodoViewModel(private val container: com.focustrace.data.AppContainer) : ViewModel() {
     private val repository = container.taskRepository
     fun start(taskId: Long, onStarted: () -> Unit) {
@@ -38,7 +38,7 @@ class TodoViewModel(private val container: com.focustrace.data.AppContainer) : V
         }
     }
 
-    val uiState = combine(repository.allTasks, repository.allCategories, container.database.focusSessionDao().observeLatest()) { tasks, categories, session -> TodoData(tasks, categories, session?.takeIf { it.status in listOf(1, 2, 3) }, session?.takeIf { it.endTime != null }?.id) }
+    val uiState = combine(repository.allTasks, repository.allCategories, container.database.focusSessionDao().observeLatest(), container.settingsRepository.settings) { tasks, categories, session, settings -> TodoData(tasks, categories, session?.takeIf { it.status in listOf(1, 2, 3) }, session?.takeIf { it.endTime != null }?.id, settings.pomodoroMinutes) }
         .asLoadState().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LoadState.Loading)
     private val _busy = MutableStateFlow(false)
     val busy = _busy.asStateFlow()

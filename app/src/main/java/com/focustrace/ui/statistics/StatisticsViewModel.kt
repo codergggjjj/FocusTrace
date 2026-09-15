@@ -29,6 +29,15 @@ class StatisticsViewModel(repository: StatisticsRepository, private val savedSta
     val uiState = combine(selection, reload) { selected, _ -> selected.range }.flatMapLatest { range ->
         repository.statistics(range).asLoadState().onStart { emit(LoadState.Loading) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), LoadState.Loading)
+    val heatmap = combine(selection, reload) { selected, attempt ->
+        statisticsRange(selected.range.start, StatisticsPeriod.MONTH, selected.range.zone) to attempt
+    }.distinctUntilChanged().flatMapLatest { (range, _) ->
+        repository.statistics(range).asLoadState().onStart { emit(LoadState.Loading) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), LoadState.Loading)
+    fun viewDay(date: LocalDate) {
+        savedState["statisticsAnchor"] = date.toEpochDay()
+        savedState["statisticsPeriod"] = StatisticsPeriod.DAY.name
+    }
     fun choose(period: StatisticsPeriod) { savedState["statisticsAnchor"] = null; savedState["statisticsPeriod"] = period.name }
     fun selectDate(date: LocalDate) {
         if (date <= LocalDate.now()) savedState["statisticsAnchor"] = date.toEpochDay()

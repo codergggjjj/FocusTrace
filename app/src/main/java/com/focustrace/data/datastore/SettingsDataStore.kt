@@ -37,7 +37,7 @@ class SettingsDataStore(context: Context) {
         store.edit { it[Keys.threshold] = seconds }
     }
     suspend fun update(value: UserSettings) {
-        require(value.pomodoroMinutes > 0 && value.breakMinutes > 0 && value.distractionThreshold >= 0)
+        require(value.pomodoroMinutes in 1..1440 && value.breakMinutes in 1..1440 && value.distractionThreshold in 0..86400)
         store.edit { p ->
             p[Keys.pomodoro] = value.pomodoroMinutes
             p[Keys.rest] = value.breakMinutes

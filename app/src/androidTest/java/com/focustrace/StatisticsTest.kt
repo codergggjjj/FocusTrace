@@ -24,6 +24,10 @@ class StatisticsTest {
             if (duration == 0L) emptyList() else listOf(DistractionEventEntity(id, id, start + 10000, start + 10000 + duration * 1000, duration)), null)
     }
 
+    @Test fun heatmapThresholdsAreStable() {
+        assertEquals(listOf(0, 1, 1, 2, 2, 3, 3, 4),
+            listOf(0L, 1L, 1799L, 1800L, 3599L, 3600L, 7199L, 7200L).map { com.focustrace.ui.statistics.heatLevel(it) })
+    }
     @Test fun calendarRangesUseMondayLeapMonthAndDst() {
         val week = statisticsRange(LocalDate.of(2023, 1, 1), StatisticsPeriod.WEEK, zone)
         assertEquals(LocalDate.of(2022, 12, 26), week.start)

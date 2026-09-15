@@ -27,6 +27,7 @@ import com.focustrace.ui.components.*
 fun StatisticsScreen(viewModel: StatisticsViewModel, onReport: (Long) -> Unit) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val selection by viewModel.selection.collectAsStateWithLifecycle()
+    val heatmap by viewModel.heatmap.collectAsStateWithLifecycle()
     var showDate by rememberSaveable { mutableStateOf(false) }
     if (showDate) PeriodDateDialog(selection, onDismiss = { showDate = false }) {
         viewModel.selectDate(it); showDate = false
@@ -82,6 +83,13 @@ fun StatisticsScreen(viewModel: StatisticsViewModel, onReport: (Long) -> Unit) {
                     }
                 }
                 if (summary.totals.sessions == 0) item { Text("这段时间暂无已结束的专注记录，完成一次专注后再来看看。") }
+                item {
+                    when (val calendar = heatmap) {
+                        is LoadState.Ready -> FocusHeatmap(calendar.value, onViewDay = viewModel::viewDay)
+                        is LoadState.Error -> TextButton(onClick = viewModel::retry) { Text("热力图加载失败，点击重试") }
+                        LoadState.Loading -> LinearProgressIndicator(Modifier.fillMaxWidth())
+                    }
+                }
                 item {
                     Text("学习记录 · ${summary.sessions.size} 次", style = MaterialTheme.typography.titleLarge)
                     Text("累计时间为有效专注时长；起止区间可能包含暂停和分心。", style = MaterialTheme.typography.bodySmall,

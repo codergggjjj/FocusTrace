@@ -4,8 +4,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -17,15 +17,28 @@ import com.focustrace.ui.components.*
 @Composable
 fun ProfileScreen(viewModel: SettingsViewModel) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    var editing by rememberSaveable { mutableStateOf(false) }
+    val busy by viewModel.busy.collectAsStateWithLifecycle()
+    val error by viewModel.error.collectAsStateWithLifecycle()
+    val loaded = (state as? LoadState.Ready)?.value
+    if (editing && loaded != null) SettingsEditor(loaded, busy, error,
+        onDismiss = { editing = false }, onSave = { value -> viewModel.save(value) { editing = false } })
     BasePage("我的", "找到适合自己的专注节奏") {
         StateContent(state) { settings ->
             TraceCard {
-                Text("专注设置", style = MaterialTheme.typography.titleMedium)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("专注设置", style = MaterialTheme.typography.titleMedium)
+                    TextButton(onClick = { editing = true }) { Text("编辑设置") }
+                }
                 SettingRow(Icons.Outlined.Timer, "番茄时长", "${settings.pomodoroMinutes} 分钟")
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 SettingRow(Icons.Outlined.Coffee, "休息时长", "${settings.breakMinutes} 分钟")
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 SettingRow(Icons.Outlined.NotificationsNone, "分心判定", "${settings.distractionThreshold} 秒")
+            }
+            TraceCard {
+                SettingRow(Icons.Outlined.PlayArrow, "自动开始休息", if (settings.autoStartBreak) "开启" else "关闭")
+                SettingRow(Icons.Outlined.Replay, "自动开始下一轮", if (settings.autoStartFocus) "开启" else "关闭")
             }
             TraceCard {
                 SettingRow(Icons.Outlined.Palette, "外观", when (settings.darkMode) {

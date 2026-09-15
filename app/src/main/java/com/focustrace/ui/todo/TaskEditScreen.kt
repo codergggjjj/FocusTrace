@@ -13,10 +13,10 @@ import androidx.compose.ui.unit.dp
 import com.focustrace.data.local.entity.*
 
 @Composable
-fun TaskEditScreen(task: TaskEntity?, categories: List<CategoryEntity>, busy: Boolean,
+fun TaskEditScreen(task: TaskEntity?, categories: List<CategoryEntity>, busy: Boolean, defaultMinutes: Int,
     onDismiss: () -> Unit, onSave: (String, Int, Long?, Int) -> Unit) {
     var title by rememberSaveable(task?.id) { mutableStateOf(task?.title ?: "") }
-    var minutes by rememberSaveable(task?.id) { mutableStateOf(task?.targetMinutes?.toString() ?: "25") }
+    var minutes by rememberSaveable(task?.id) { mutableStateOf(task?.targetMinutes?.toString() ?: defaultMinutes.toString()) }
     var categoryId by rememberSaveable(task?.id) { mutableStateOf(task?.categoryId) }
     var timerType by rememberSaveable(task?.id) { mutableIntStateOf(task?.timerType ?: 0) }
     var expanded by remember { mutableStateOf(false) }

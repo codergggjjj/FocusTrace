@@ -50,6 +50,12 @@ class FoundationTest {
             compose.onNodeWithTag("statistics-list").performScrollToNode(hasTestTag("study-total"))
             compose.waitUntil(5000) { compose.onAllNodesWithText("1 时 30 分 0 秒").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("study-total").assertTextEquals("1 时 30 分 0 秒")
+            compose.onNodeWithTag("statistics-list").performScrollToNode(hasTestTag("heat-day-2024-06-12"))
+            compose.onNodeWithTag("heat-day-2024-06-12").performClick()
+            compose.onNodeWithText("学习时间：1 时 0 分 0 秒").assertIsDisplayed()
+            compose.onNodeWithText("查看当天记录").performClick()
+            compose.onNodeWithTag("statistics-list").performScrollToNode(hasTestTag("statistics-range"))
+            compose.onNodeWithTag("statistics-range").assertTextEquals("2024-06-12")
             compose.onNodeWithTag("statistics-list").performScrollToNode(hasText("今日"))
             compose.onNodeWithText("今日").performClick()
             compose.onNodeWithText("选择日期").performClick()
@@ -73,6 +79,37 @@ class FoundationTest {
                 db.focusSessionDao().getSession(secondId)?.let { db.focusSessionDao().delete(it) }
             }
         }
+    }
+
+    @Test fun settingsEditValidatesPersistsAndAppliesNewTaskDefault() {
+        val app = ApplicationProvider.getApplicationContext<FocusTraceApplication>()
+        val original = runBlocking { app.container.settingsRepository.settings.first() }
+        try {
+            compose.onAllNodesWithText("我的").onFirst().performClick()
+            compose.onNodeWithText("编辑设置").performScrollTo().performClick()
+            compose.onNodeWithText("默认番茄分钟").performScrollTo().performTextReplacement("0")
+            compose.onNodeWithText("保存设置").assertIsNotEnabled()
+            compose.onNodeWithText("默认番茄分钟").performTextReplacement("42")
+            compose.onNodeWithText("默认休息分钟").performScrollTo().performTextReplacement("7")
+            compose.onNodeWithText("分心阈值秒数").performScrollTo().performTextReplacement("10")
+            compose.onNodeWithTag("自动开始休息").performScrollTo().performClick()
+            compose.onNodeWithTag("自动开始下一轮").performScrollTo().performClick()
+            compose.onNodeWithTag("theme-DARK").performScrollTo().performClick()
+            compose.activityRule.scenario.recreate()
+            compose.onNodeWithText("保存设置").performClick()
+            compose.waitUntil(5000) { compose.onAllNodesWithText("保存设置").fetchSemanticsNodes().isEmpty() }
+            val saved = runBlocking { app.container.settingsRepository.settings.first() }
+            assertEquals(42, saved.pomodoroMinutes)
+            assertEquals(7, saved.breakMinutes)
+            assertEquals(10, saved.distractionThreshold)
+            assertEquals(!original.autoStartBreak, saved.autoStartBreak)
+            assertEquals(!original.autoStartFocus, saved.autoStartFocus)
+            assertEquals(com.focustrace.data.datastore.ThemeMode.DARK, saved.darkMode)
+            compose.onAllNodesWithText("待办").onFirst().performClick()
+            compose.onNodeWithText("创建待办").performClick()
+            compose.onNodeWithText("目标分钟数").assertTextContains("42")
+            compose.onNodeWithText("取消").performClick()
+        } finally { runBlocking { app.container.settingsRepository.update(original) } }
     }
 
     @Test fun statisticsPeriodsAndHistorySurviveRecreation() {
