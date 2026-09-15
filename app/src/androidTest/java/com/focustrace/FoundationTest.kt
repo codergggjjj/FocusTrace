@@ -51,6 +51,36 @@ class FoundationTest {
         compose.onNodeWithText("上一周").assertIsDisplayed()
     }
 
+    @Test fun stopwatchTaskPersistsAndSelectsStopwatchWhenStarting() {
+        compose.onNodeWithText("创建待办").performClick()
+        compose.onNodeWithText("待办名称").performTextInput("正向待办验证")
+        compose.onNodeWithText("正向计时").performScrollTo().performClick()
+        compose.onNodeWithText("目标分钟数").assertDoesNotExist()
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithText("正向计时").assertIsSelected()
+        compose.onNodeWithText("保存").performClick()
+        compose.waitUntil(5000) { compose.onAllNodesWithText("正向待办验证").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("正向待办验证").performClick()
+        compose.onNodeWithText("正向计时").assertIsSelected()
+        compose.onNodeWithText("番茄钟").performClick()
+        compose.onNodeWithText("目标分钟数").performTextReplacement("15")
+        compose.onNodeWithText("正向计时").performClick()
+        compose.onNodeWithText("保存").performClick()
+        val app = ApplicationProvider.getApplicationContext<FocusTraceApplication>()
+        val task = runBlocking { app.container.database.taskDao().getAll().first().first { it.title == "正向待办验证" } }
+        assertEquals(1, task.timerType)
+        compose.onAllNodesWithText("专注").onFirst().performClick()
+        compose.onNodeWithText("自由专注（选择待办）").performScrollTo().performClick()
+        compose.onNodeWithText("正向待办验证").performClick()
+        compose.onNodeWithText("开始正向计时").performScrollTo().performClick()
+        compose.waitUntil(5000) { compose.onAllNodesWithText("正在专注").fetchSemanticsNodes().isNotEmpty() }
+        val session = runBlocking { app.container.database.focusSessionDao().latest()!! }
+        assertEquals(task.id, session.taskId)
+        assertEquals(1, session.type)
+        compose.onNodeWithText("结束专注").performScrollTo().performClick()
+        compose.onNodeWithText("确认结束").performClick()
+    }
+
     @Test fun taskCrudPersistsAndValidatesInput() {
         compose.onNodeWithText("创建待办").performClick()
         compose.onNodeWithText("保存").assertIsNotEnabled()

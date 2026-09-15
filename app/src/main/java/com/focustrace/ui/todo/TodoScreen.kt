@@ -51,7 +51,7 @@ fun TodoScreen(viewModel: TodoViewModel) {
                             Checkbox(checked = task.completed, onCheckedChange = { viewModel.toggle(task) }, enabled = !busy)
                             Column(Modifier.weight(1f).clickable(enabled = !busy) { editingId = task.id; editorOpen = true }) {
                                 Text(task.title, style = MaterialTheme.typography.titleMedium, textDecoration = if (task.completed) TextDecoration.LineThrough else null, color = if (task.completed) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
-                                Text("${data.categories.firstOrNull { it.id == task.categoryId }?.name ?: "未分类"} · ${task.targetMinutes} 分钟", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("${data.categories.firstOrNull { it.id == task.categoryId }?.name ?: "未分类"} · ${if (task.timerType == 1) "正向计时" else "番茄钟 · ${task.targetMinutes} 分钟"}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 if (task.completed) Text("已完成")
                             }
                             TextButton(onClick = { deletingId = task.id }, enabled = !busy) { Text("删除") }
@@ -63,7 +63,7 @@ fun TodoScreen(viewModel: TodoViewModel) {
                 val original = data.tasks.firstOrNull { it.id == editingId }
                 TaskEditScreen(original, data.categories, busy,
                     onDismiss = { editorOpen = false },
-                    onSave = { title, minutes, category -> viewModel.save(original, title, minutes, category) { editorOpen = false } })
+                    onSave = { title, minutes, category, timerType -> viewModel.save(original, title, minutes, category, timerType) { editorOpen = false } })
             }
             data.tasks.firstOrNull { it.id == deletingId }?.let { task ->
                 AlertDialog(onDismissRequest = { if (!busy) deletingId = null }, title = { Text("删除待办？") },

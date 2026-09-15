@@ -93,7 +93,7 @@ fun FocusHomeScreen(viewModel: FocusViewModel, onReport: (Long) -> Unit) {
                 DropdownMenu(expanded = chooseTask, onDismissRequest = { chooseTask = false }) {
                     DropdownMenuItem(text = { Text("自由专注") }, onClick = { taskId = null; chooseTask = false })
                     state.tasks.filter { !it.completed }.forEach { task ->
-                        DropdownMenuItem(text = { Text(task.title) }, onClick = { taskId = task.id; chooseTask = false })
+                        DropdownMenuItem(text = { Text(task.title) }, onClick = { taskId = task.id; stopwatch = task.timerType == 1; minutes = task.targetMinutes.toString(); chooseTask = false })
                     }
                 }
             }

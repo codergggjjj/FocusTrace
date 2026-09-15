@@ -26,12 +26,12 @@ class TodoViewModel(private val repository: TaskRepository) : ViewModel() {
             finally { _busy.value = false }
         }
     }
-    fun save(original: TaskEntity?, title: String, minutes: Int, categoryId: Long?, done: () -> Unit) {
-        require(title.trim().isNotEmpty() && minutes in 1..1440)
+    fun save(original: TaskEntity?, title: String, minutes: Int, categoryId: Long?, timerType: Int, done: () -> Unit) {
+        require(title.trim().isNotEmpty() && minutes in 1..1440 && timerType in 0..1)
         write {
             val now = System.currentTimeMillis()
-            val task = original?.copy(title = title.trim(), targetMinutes = minutes, categoryId = categoryId, updatedAt = now)
-                ?: TaskEntity(title = title.trim(), targetMinutes = minutes, categoryId = categoryId, createdAt = now, updatedAt = now)
+            val task = original?.copy(title = title.trim(), targetMinutes = minutes, timerType = timerType, categoryId = categoryId, updatedAt = now)
+                ?: TaskEntity(title = title.trim(), targetMinutes = minutes, timerType = timerType, categoryId = categoryId, createdAt = now, updatedAt = now)
             if (original == null) repository.insert(task) else repository.update(task)
             done()
         }

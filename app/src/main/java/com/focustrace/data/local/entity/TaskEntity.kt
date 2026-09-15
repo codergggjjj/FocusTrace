@@ -10,5 +10,6 @@ data class TaskEntity(
     val repeatType: String = "NONE",
     val reminderTime: Long? = null,
     val createdAt: Long,
-    val updatedAt: Long
+    val updatedAt: Long,
+    @ColumnInfo(defaultValue = "0") val timerType: Int = 0 // 0: pomodoro, 1: stopwatch
 )

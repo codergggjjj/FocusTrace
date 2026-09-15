@@ -14,17 +14,25 @@ import com.focustrace.data.local.entity.*
 
 @Composable
 fun TaskEditScreen(task: TaskEntity?, categories: List<CategoryEntity>, busy: Boolean,
-    onDismiss: () -> Unit, onSave: (String, Int, Long?) -> Unit) {
+    onDismiss: () -> Unit, onSave: (String, Int, Long?, Int) -> Unit) {
     var title by rememberSaveable(task?.id) { mutableStateOf(task?.title ?: "") }
     var minutes by rememberSaveable(task?.id) { mutableStateOf(task?.targetMinutes?.toString() ?: "25") }
     var categoryId by rememberSaveable(task?.id) { mutableStateOf(task?.categoryId) }
+    var timerType by rememberSaveable(task?.id) { mutableIntStateOf(task?.timerType ?: 0) }
     var expanded by remember { mutableStateOf(false) }
     val duration = minutes.toIntOrNull()
     AlertDialog(onDismissRequest = { if (!busy) onDismiss() }, title = { Text(if (task == null) "创建待办" else "编辑待办") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(value = title, onValueChange = { title = it.take(100) }, label = { Text("待办名称") }, singleLine = true, enabled = !busy)
-                OutlinedTextField(value = minutes, onValueChange = { minutes = it.take(5) }, label = { Text("目标分钟数") }, singleLine = true,
+                Text("计时方式", style = MaterialTheme.typography.titleSmall)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(selected = timerType == 0, onClick = { timerType = 0 }, enabled = !busy, label = { Text("番茄钟") })
+                    FilterChip(selected = timerType == 1, onClick = { timerType = 1 }, enabled = !busy, label = { Text("正向计时") })
+                }
+                if (timerType == 1) Text("从零开始计时，手动结束，无需设置目标时长。",
+                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                else OutlinedTextField(value = minutes, onValueChange = { minutes = it.take(5) }, label = { Text("目标分钟数") }, singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), enabled = !busy,
                     isError = duration == null || duration !in 1..1440,
                     supportingText = { Text("请输入 1–1440 分钟") })
@@ -37,7 +45,7 @@ fun TaskEditScreen(task: TaskEntity?, categories: List<CategoryEntity>, busy: Bo
                 }
             }
         },
-        confirmButton = { TextButton(enabled = !busy && title.isNotBlank() && duration != null && duration in 1..1440,
-            onClick = { onSave(title, duration!!, categoryId) }) { Text(if (busy) "保存中…" else "保存") } },
+        confirmButton = { TextButton(enabled = !busy && title.isNotBlank() && (timerType == 1 || (duration != null && duration in 1..1440)),
+            onClick = { onSave(title, duration?.takeIf { it in 1..1440 } ?: 25, categoryId, timerType) }) { Text(if (busy) "保存中…" else "保存") } },
         dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text("取消") } })
 }
