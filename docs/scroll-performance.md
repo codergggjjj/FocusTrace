@@ -12,13 +12,13 @@
 | data/repository/StatisticsRepository.kt | Room 查询本身异步，但后续 map 在 ViewModel 的 Main 上执行分组、统计与排序 | distinctUntilChanged 避免内容未变时重复汇总，flowOn(Default) 把 CPU 工作移出主线程；总算法仍约 O(N log N + E)，不再占用 UI 线程 |
 | data/repository/FocusRepository.kt | 报告事件排序与统计在 Main 执行 | 报告计算移到 Default、相同数据不重复计算，O(E log E) 算法不变 |
 | statistics/Statistics.kt | 过滤每条记录都重新计算带时区的区间边界 | 每次汇总仅计算一次，边界转换从 O(N) 次降为 O(1) 次，过滤仍 O(N) |
-| ui/todo/TodoScreen.kt | 页面状态变动时重复筛选、统计；每个可见任务线性查找分类；所有分类一次性布局 | 按任务/筛选条件 remember；分类表一次 O(C) 建立，单任务查找 O(C)→平均 O(1)；LazyRow 只布局可见分类；TaskCard 接收稳定参数与缓存回调，允许未变化的卡片跳过重组 |
-| ui/statistics/StatisticsScreen.kt | 每个可见记录创建 formatter；所有日期柱形一次性布局；动态栏目缺少明确身份/类型 | formatter 按时区复用；柱形 LazyRow，日期 key；结构区块和分类有稳定 key/contentType；最大值只在数据或指标变动时重算，选中柱形不再扫描全部日期 |
+| ui/todo/TodoScreen.kt | 页面状态变动时重复筛选、统计；每个可见任务线性查找分类；所有分类一次性布局 | v1.0.1 已移除分类筛选和分类查找；TaskCard 接收稳定参数与缓存回调，允许未变化的卡片跳过重组 |
+| ui/statistics/StatisticsScreen.kt | 每个可见记录创建 formatter；所有日期柱形一次性布局；动态栏目缺少明确身份/类型 | formatter 按时区复用；柱形 LazyRow，日期 key；结构区块有稳定 key/contentType；最大值只在数据或指标变动时重算，选中柱形不再扫描全部日期 |
 | ui/focus/FocusViewModel.kt | 每秒更新包含整页数据的状态；进入过专注后无论是否结束都每秒读库 | TimerUiState 单独发送；暂停/结束/空闲/切出冻结时由 Room 变化触发刷新，只有活跃专注和休息轮询；每次刷新只计算一次 elapsed |
 | ui/focus/FocusHomeScreen.kt | 页面根部读取每秒变化值 | 每秒变化由 LiveTimer 消费，重组范围缩小到计时显示子树，其余控制与说明不再因 tick 失效 |
 | app/build.gradle.kts | 仅默认 debug/release，手机使用 debug 包 | 增加 performance 构建：非 debuggable、R8 优化、资源收缩；沿用本地 debug 签名便于覆盖安装，不属于正式发布签名 |
 
-N=专注/任务记录数，E=分心事件数，C=分类数。remember 对数据引用不变的常见重组直接复用；数据真正变化时仍重新计算，没有声称消除加载整份数据的成本。
+N=专注/任务记录数，E=分心事件数。remember 对数据引用不变的常见重组直接复用；数据真正变化时仍重新计算，没有声称消除加载整份数据的成本。
 
 ## 未盲目修改的部分
 
@@ -30,7 +30,7 @@ N=专注/任务记录数，E=分心事件数，C=分类数。remember 对数据�
 
 ## 验证方法
 
-ScrollPerformanceTest 在模拟器建立 300 个待办、40 个新增分类、1000 条专注记录，分别上下滑动 6 次，使用 Window.FrameMetrics 采样 TOTAL_DURATION；finally 精确清理本测试插入的记录。
+ScrollPerformanceTest 在模拟器建立 300 个无分类待办、1000 条专注记录，分别上下滑动 6 次，使用 Window.FrameMetrics 采样 TOTAL_DURATION；finally 精确清理本测试插入的记录。
 采样是自动化手势 + debug 模拟器诊断，并非 Macrobenchmark 真机测评；虚拟 GPU、冷启动/JIT、后台构建负载、测试框架合成手势与帧样本数量都会影响数值。不能据此宣称手机提升固定百分比。
 
 最初版本采样：待办 p50/p95 = 86.02/254.10ms（33 帧）；统计 34.79/184.58ms（68 帧）。

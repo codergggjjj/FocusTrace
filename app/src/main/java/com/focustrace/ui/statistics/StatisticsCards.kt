@@ -28,7 +28,6 @@ internal fun compactDuration(seconds: Long): String = when {
     seconds > 0 -> "不足 1 分钟"
     else -> "0 分钟"
 }
-
 @Composable
 internal fun StudyOverview(totals: StatisticsTotals, onRecords: () -> Unit, onDetails: () -> Unit) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer), modifier = Modifier.fillMaxWidth()) {
@@ -52,7 +51,6 @@ internal fun StudyOverview(totals: StatisticsTotals, onRecords: () -> Unit, onDe
         Text("分心 ${totals.distractions} 次 · ${compactDuration(totals.distractionSeconds)}   查看详情")
     }
 }
-
 @Composable
 private fun OverviewNumber(value: String, label: String, modifier: Modifier) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -109,26 +107,4 @@ internal fun StudyTrend(summary: StatisticsSummary, period: StatisticsPeriod) {
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
         }
     }
-}
-
-@Composable
-internal fun CategoryBreakdown(categories: List<CategoryStatistics>) {
-    var expanded by rememberSaveable { mutableStateOf(false) }
-    val total = remember(categories) { categories.sumOf { it.focusSeconds }.coerceAtLeast(1) }
-    TraceCard {
-        Text("学习时间分配", style = MaterialTheme.typography.titleMedium)
-        if (categories.isEmpty()) Text("完成一次专注后查看分类分布", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        categories.take(5).forEach { category ->
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(category.name, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                    Text(compactDuration(category.focusSeconds), style = MaterialTheme.typography.labelMedium)
-                }
-                LinearProgressIndicator(progress = { category.focusSeconds.toFloat() / total }, modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
-                    color = MaterialTheme.colorScheme.secondary, trackColor = MaterialTheme.colorScheme.surfaceVariant)
-            }
-        }
-        if (categories.size > 5) TextButton(onClick = { expanded = true }) { Text("查看全部 ${categories.size} 个分类") }
-    }
-    if (expanded) CategoryDetailsDialog(categories) { expanded = false }
 }

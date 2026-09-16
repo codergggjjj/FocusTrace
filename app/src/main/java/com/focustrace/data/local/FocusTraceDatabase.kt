@@ -4,7 +4,7 @@ import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.focustrace.data.local.dao.*
 import com.focustrace.data.local.entity.*
-@Database(entities = [CategoryEntity::class, TaskEntity::class, FocusSessionEntity::class, DistractionEventEntity::class], version = 5, exportSchema = true)
+@Database(entities = [CategoryEntity::class, TaskEntity::class, FocusSessionEntity::class, DistractionEventEntity::class], version = 6, exportSchema = true)
 abstract class FocusTraceDatabase : RoomDatabase() {
     abstract fun taskDao(): TaskDao
     abstract fun categoryDao(): CategoryDao
@@ -37,12 +37,10 @@ abstract class FocusTraceDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE tasks ADD COLUMN timerType INTEGER NOT NULL DEFAULT 0")
             }
         }
-        val SeedCategories = object : Callback() {
-            override fun onCreate(db: SupportSQLiteDatabase) {
-                super.onCreate(db)
-                listOf("学习", "工作", "阅读", "运动", "其他").forEachIndexed { index, name ->
-                    db.execSQL("INSERT INTO categories (name, icon, sortOrder, createdAt) VALUES (?, ?, ?, ?)", arrayOf(name, listOf("school", "work", "book", "fitness", "label")[index], index, System.currentTimeMillis()))
-                }
+        val Migration5To6 = object : androidx.room.migration.Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("UPDATE tasks SET categoryId = NULL")
+                db.execSQL("DELETE FROM categories")
             }
         }
     }

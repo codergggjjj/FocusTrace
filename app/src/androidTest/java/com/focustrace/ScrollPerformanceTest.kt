@@ -23,17 +23,12 @@ class ScrollPerformanceTest {
     @Test fun largeListsScrollWithoutChangingData() {
         val db = ApplicationProvider.getApplicationContext<FocusTraceApplication>().container.database
         val tasks = mutableListOf<TaskEntity>()
-        val categories = mutableListOf<CategoryEntity>()
         val sessions = mutableListOf<FocusSessionEntity>()
         val start = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
         try {
             runBlocking { db.withTransaction {
-                repeat(40) { index ->
-                    val c = CategoryEntity(name = "性能分类 $index", icon = "label", sortOrder = 100 + index, createdAt = start)
-                    categories += c.copy(id = db.categoryDao().insert(c))
-                }
                 repeat(300) { index ->
-                    val t = TaskEntity(title = "滑动测试任务 $index", categoryId = categories[index % 40].id, targetMinutes = 25, createdAt = start, updatedAt = start)
+                    val t = TaskEntity(title = "滑动测试任务 $index", targetMinutes = 25, createdAt = start, updatedAt = start)
                     tasks += t.copy(id = db.taskDao().insert(t))
                 }
                 repeat(1000) { index ->
@@ -51,7 +46,6 @@ class ScrollPerformanceTest {
             runBlocking { db.withTransaction {
                 sessions.forEach { db.focusSessionDao().delete(it) }
                 tasks.forEach { db.taskDao().delete(it) }
-                categories.forEach { db.categoryDao().delete(it) }
             } }
         }
     }

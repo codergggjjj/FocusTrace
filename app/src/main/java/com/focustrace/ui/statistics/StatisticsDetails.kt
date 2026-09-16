@@ -58,17 +58,6 @@ internal fun FocusDetailsDialog(totals: StatisticsTotals, onDismiss: () -> Unit)
 }
 
 @Composable
-internal fun CategoryDetailsDialog(categories: List<CategoryStatistics>, onDismiss: () -> Unit) {
-    DetailWindow("分类统计", "关闭分类", onDismiss) {
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(20.dp)) {
-            items(categories, key = { it.id ?: -1L }, contentType = { "category" }) { category ->
-                DetailMetric(category.name, "${compactDuration(category.focusSeconds)} · ${category.sessions} 次")
-            }
-        }
-    }
-}
-
-@Composable
 private fun DetailWindow(title: String, closeLabel: String, onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.widthIn(max = 640.dp).fillMaxWidth().fillMaxHeight(.9f).padding(16.dp), shape = MaterialTheme.shapes.extraLarge) {

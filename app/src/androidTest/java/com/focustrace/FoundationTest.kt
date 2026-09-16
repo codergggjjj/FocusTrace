@@ -179,18 +179,18 @@ class FoundationTest {
     @Test fun stopwatchTaskPersistsAndSelectsStopwatchWhenStarting() {
         compose.onNodeWithText("创建待办").performClick()
         compose.onNodeWithText("待办名称").performTextInput("正向待办验证")
-        compose.onNodeWithText("正向计时").performScrollTo().performClick()
+        compose.onNodeWithTag("timer-type-stopwatch").performScrollTo().performClick()
         compose.onNodeWithText("目标分钟数").assertDoesNotExist()
         compose.activityRule.scenario.recreate()
-        compose.onNodeWithText("正向计时").assertIsSelected()
+        compose.onNodeWithTag("timer-type-stopwatch").assertIsSelected()
         compose.onNodeWithText("保存").performClick()
         compose.waitUntil(5000) { compose.onAllNodesWithText("正向待办验证").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("todo-list").performScrollToNode(hasText("正向待办验证"))
         compose.onNodeWithText("正向待办验证").performScrollTo().performClick()
-        compose.onNodeWithText("正向计时").assertIsSelected()
-        compose.onNodeWithText("番茄钟").performClick()
+        compose.onNodeWithTag("timer-type-stopwatch").assertIsSelected()
+        compose.onNodeWithTag("timer-type-pomodoro").performClick()
         compose.onNodeWithText("目标分钟数").performTextReplacement("15")
-        compose.onNodeWithText("正向计时").performClick()
+        compose.onNodeWithTag("timer-type-stopwatch").performClick()
         compose.onNodeWithText("保存").performClick()
         val app = ApplicationProvider.getApplicationContext<FocusTraceApplication>()
         val task = runBlocking { app.container.database.taskDao().getAll().first().first { it.title == "正向待办验证" } }
@@ -257,8 +257,8 @@ class FoundationTest {
         compose.onNodeWithText("目标分钟数").performTextReplacement("0")
         compose.onNodeWithText("保存").assertIsNotEnabled()
         compose.onNodeWithText("目标分钟数").performTextReplacement("45")
-        compose.onNodeWithText("选择分类").performClick()
-        compose.onAllNodesWithText("学习").onLast().performClick()
+        compose.onNodeWithText("选择分类").assertDoesNotExist()
+        compose.onNodeWithText("添加分类").assertDoesNotExist()
         compose.onNodeWithText("保存").performClick()
         compose.waitUntil(5_000) { compose.onAllNodesWithText("验证任务").fetchSemanticsNodes().isNotEmpty() }
         compose.activityRule.scenario.recreate()
@@ -270,9 +270,11 @@ class FoundationTest {
             .container.database.taskDao().getAll().first().first { it.title == "修改后的任务" }.id }
         compose.onNodeWithTag("complete-task-$editedId").performClick()
         compose.waitUntil(5_000) { compose.onAllNodesWithText("已完成").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("delete-task-$editedId").assertDoesNotExist()
+        compose.onNodeWithText("修改后的任务").performClick()
         compose.onNodeWithTag("delete-task-$editedId").performClick()
-        compose.onNodeWithText("取消").performClick()
-        compose.onNodeWithText("修改后的任务").assertIsDisplayed()
+        compose.onAllNodesWithText("取消").onLast().performClick()
+        compose.onNodeWithText("编辑待办").assertIsDisplayed()
         compose.onNodeWithTag("delete-task-$editedId").performClick()
         compose.onNodeWithText("确认删除").performClick()
         compose.waitUntil(5_000) { compose.onAllNodesWithText("修改后的任务").fetchSemanticsNodes().isEmpty() }
@@ -390,11 +392,10 @@ class FoundationTest {
 
     @Test fun roomRelationsAndTimeBoundaries() = runBlocking {
         val db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), FocusTraceDatabase::class.java)
-            .addCallback(FocusTraceDatabase.SeedCategories).build()
+            .build()
         try {
-            val categories = db.categoryDao().getAll().first()
-            assertEquals(listOf("学习", "工作", "阅读", "运动", "其他"), categories.map { it.name })
-            val task = TaskEntity(categoryId = categories.first().id, title = "测试待办", targetMinutes = 25, createdAt = 100, updatedAt = 100)
+            assertTrue(db.categoryDao().getAll().first().isEmpty())
+            val task = TaskEntity(title = "测试待办", targetMinutes = 25, createdAt = 100, updatedAt = 100)
             val taskId = db.taskDao().insert(task)
             val session = FocusSessionEntity(taskId = taskId, type = 0, startTime = 100, plannedSeconds = 1500)
             val sessionId = db.focusSessionDao().insert(session)
@@ -402,9 +403,8 @@ class FoundationTest {
             assertEquals(1, db.focusSessionDao().getSessionsBetween(100, 101).first().size)
             assertTrue(db.focusSessionDao().getSessionsBetween(0, 100).first().isEmpty())
             assertEquals(5L, db.distractionDao().getBySession(sessionId).first().single().durationSeconds)
-            db.categoryDao().delete(categories.first())
             assertNull(db.taskDao().getAll().first().single().categoryId)
-            db.taskDao().delete(task.copy(id = taskId, categoryId = null))
+            db.taskDao().delete(task.copy(id = taskId))
             assertNull(db.focusSessionDao().getSession(sessionId)!!.taskId)
             db.focusSessionDao().delete(session.copy(id = sessionId, taskId = null))
             assertTrue(db.distractionDao().getBySession(sessionId).first().isEmpty())

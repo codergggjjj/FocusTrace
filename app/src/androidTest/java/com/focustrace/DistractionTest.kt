@@ -197,4 +197,29 @@ class DistractionTest {
             close()
         }
     }
+
+    @Test fun migrationFiveToSixRemovesCategoriesAndKeepsTasks() {
+        migration.createDatabase("remove-categories-migration", 5).apply {
+            execSQL("INSERT INTO categories (id, name, icon, sortOrder, createdAt) VALUES (1, '学习', 'book', 0, 1)")
+            execSQL("INSERT INTO tasks (id, categoryId, title, targetMinutes, completed, repeatType, reminderTime, createdAt, updatedAt, timerType) VALUES (1, 1, '保留任务', 25, 0, 'NONE', NULL, 1, 1, 0)")
+            close()
+        }
+        migration.runMigrationsAndValidate(
+            "remove-categories-migration",
+            6,
+            true,
+            FocusTraceDatabase.Migration5To6,
+        ).apply {
+            query("SELECT COUNT(*) FROM categories").use {
+                assertTrue(it.moveToFirst())
+                assertEquals(0, it.getInt(0))
+            }
+            query("SELECT title, categoryId FROM tasks WHERE id = 1").use {
+                assertTrue(it.moveToFirst())
+                assertEquals("保留任务", it.getString(0))
+                assertTrue(it.isNull(1))
+            }
+            close()
+        }
+    }
 }

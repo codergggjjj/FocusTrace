@@ -7,7 +7,7 @@ import com.focustrace.ui.components.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
-data class TodoData(val tasks: List<TaskEntity>, val categories: List<CategoryEntity>, val activeSession: FocusSessionEntity?, val reportId: Long?, val defaultMinutes: Int)
+data class TodoData(val tasks: List<TaskEntity>, val activeSession: FocusSessionEntity?, val reportId: Long?, val defaultMinutes: Int)
 class TodoViewModel(private val container: com.focustrace.data.AppContainer) : ViewModel() {
     private val repository = container.taskRepository
     fun start(taskId: Long, onStarted: () -> Unit) {
@@ -38,7 +38,9 @@ class TodoViewModel(private val container: com.focustrace.data.AppContainer) : V
         }
     }
 
-    val uiState = combine(repository.allTasks, repository.allCategories, container.database.focusSessionDao().observeLatest(), container.settingsRepository.settings) { tasks, categories, session, settings -> TodoData(tasks, categories, session?.takeIf { it.status in listOf(1, 2, 3) }, session?.takeIf { it.endTime != null }?.id, settings.pomodoroMinutes) }
+    val uiState = combine(repository.allTasks, container.database.focusSessionDao().observeLatest(), container.settingsRepository.settings) { tasks, session, settings ->
+        TodoData(tasks, session?.takeIf { it.status in listOf(1, 2, 3) }, session?.takeIf { it.endTime != null }?.id, settings.pomodoroMinutes)
+    }
         .asLoadState().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LoadState.Loading)
     private val _busy = MutableStateFlow(false)
     val busy = _busy.asStateFlow()
@@ -54,23 +56,16 @@ class TodoViewModel(private val container: com.focustrace.data.AppContainer) : V
             finally { _busy.value = false }
         }
     }
-    fun save(original: TaskEntity?, title: String, minutes: Int, categoryId: Long?, timerType: Int, done: () -> Unit) {
+    fun save(original: TaskEntity?, title: String, minutes: Int, timerType: Int, done: () -> Unit) {
         require(title.trim().isNotEmpty() && minutes in 1..1440 && timerType in 0..1)
         write {
             val now = System.currentTimeMillis()
-            val task = original?.copy(title = title.trim(), targetMinutes = minutes, timerType = timerType, categoryId = categoryId, updatedAt = now)
-                ?: TaskEntity(title = title.trim(), targetMinutes = minutes, timerType = timerType, categoryId = categoryId, createdAt = now, updatedAt = now)
+            val task = original?.copy(title = title.trim(), targetMinutes = minutes, timerType = timerType, categoryId = null, updatedAt = now)
+                ?: TaskEntity(title = title.trim(), targetMinutes = minutes, timerType = timerType, createdAt = now, updatedAt = now)
             if (original == null) repository.insert(task) else repository.update(task)
             done()
         }
     }
     fun toggle(task: TaskEntity) = write { repository.update(task.copy(completed = !task.completed, updatedAt = System.currentTimeMillis())) }
     fun delete(task: TaskEntity, done: () -> Unit) = write { repository.delete(task); done() }
-    fun addCategory(name: String, done: () -> Unit) {
-        val clean = name.trim()
-        if (clean.isEmpty()) return
-        val data = (uiState.value as? LoadState.Ready)?.value ?: return
-        if (data.categories.any { it.name == clean }) { _error.value = "分类已存在"; return }
-        write { repository.addCategory(clean); done() }
-    }
 }

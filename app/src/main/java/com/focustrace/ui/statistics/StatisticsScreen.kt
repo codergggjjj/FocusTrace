@@ -36,7 +36,7 @@ fun StatisticsScreen(viewModel: StatisticsViewModel, onReport: (Long) -> Unit) {
     val summary = (state as? LoadState.Ready)?.value
     if (showDetails && summary != null) FocusDetailsDialog(summary.totals) { showDetails = false }
     if (showRules) AlertDialog(onDismissRequest = { showRules = false }, title = { Text("统计说明") },
-        text = { Text("学习时间为有效专注时长，不含暂停和分心。记录按开始日归属；日视图的时段按开始小时归属，不代表实际逐小时分配。周一为每周起点。\n\n专注率 = 有效专注 ÷（有效专注 + 分心时间）。首次分心均值仅统计发生过分心的记录。分类按待办当前分类汇总。") },
+        text = { Text("学习时间为有效专注时长，不含暂停和分心。记录按开始日归属；日视图的时段按开始小时归属，不代表实际逐小时分配。周一为每周起点。\n\n专注率 = 有效专注 ÷（有效专注 + 分心时间）。首次分心均值仅统计发生过分心的记录。") },
         confirmButton = { TextButton(onClick = { showRules = false }) { Text("知道了") } })
     LazyColumn(Modifier.fillMaxSize().testTag("statistics-list"), contentPadding = PaddingValues(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -85,7 +85,6 @@ fun StatisticsScreen(viewModel: StatisticsViewModel, onReport: (Long) -> Unit) {
                         LoadState.Loading -> LinearProgressIndicator(Modifier.fillMaxWidth())
                     }
                 }
-                item(key = "categories", contentType = "categories") { CategoryBreakdown(value.value.categories) }
                 item(key = "current", contentType = "current") {
                     TextButton(onClick = viewModel::current, modifier = Modifier.fillMaxWidth()) { Text("回到${selection.period.label}") }
                 }

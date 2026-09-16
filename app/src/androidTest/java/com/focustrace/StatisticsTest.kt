@@ -21,7 +21,7 @@ class StatisticsTest {
         val start = date.atStartOfDay(zone).toInstant().toEpochMilli()
         return StatisticsRecord(FocusSessionEntity(id = id, type = 0, startTime = start,
             endTime = start + 86400001, plannedSeconds = 100, focusSeconds = focus, status = 4),
-            if (duration == 0L) emptyList() else listOf(DistractionEventEntity(id, id, start + 10000, start + 10000 + duration * 1000, duration)), null)
+            if (duration == 0L) emptyList() else listOf(DistractionEventEntity(id, id, start + 10000, start + 10000 + duration * 1000, duration)))
     }
 
     @Test fun hourlyChartUsesStartHourAndKeepsEffectiveTotals() {
@@ -68,23 +68,20 @@ class StatisticsTest {
         assertEquals(10L, result.totals.averageFirstDistractionSeconds)
         assertEquals(0L, result.days.first().totals.focusSeconds)
         assertEquals(1000L, result.days.last().totals.focusSeconds)
-        assertEquals(1000L, result.categories.single().focusSeconds)
         assertEquals(0, summarizeStatistics(listOf(a), statisticsRange(date.plusDays(1), StatisticsPeriod.DAY, zone)).totals.sessions)
         assertNull(summarizeStatistics(emptyList(), range).totals.focusPercent)
     }
 
-    @Test fun roomStatisticsResolveCategoriesAndObserveUpdatedRecords() = runBlocking {
+    @Test fun roomStatisticsObserveUpdatedRecords() = runBlocking {
         val db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), FocusTraceDatabase::class.java).build()
         try {
-            val categoryId = db.categoryDao().insert(CategoryEntity(name = "学习", icon = "book", sortOrder = 0, createdAt = 1))
-            val taskId = db.taskDao().insert(TaskEntity(title = "测试", categoryId = categoryId, targetMinutes = 25, createdAt = 1, updatedAt = 1))
+            val taskId = db.taskDao().insert(TaskEntity(title = "测试", targetMinutes = 25, createdAt = 1, updatedAt = 1))
             val sample = row(1, 100, 20)
             db.focusSessionDao().insert(sample.session.copy(taskId = taskId))
             db.distractionDao().insert(sample.events.single())
             val range = statisticsRange(date, StatisticsPeriod.DAY, zone)
             val flow = db.focusSessionDao().observeStatistics(range.startMillis, range.endMillis)
             val result = summarizeStatistics(flow.first(), range)
-            assertEquals("学习", result.categories.single().name)
             assertEquals(20L, result.totals.distractionSeconds)
             db.focusSessionDao().update(sample.session.copy(taskId = taskId, focusSeconds = 200))
             assertEquals(200L, summarizeStatistics(flow.first(), range).totals.focusSeconds)
