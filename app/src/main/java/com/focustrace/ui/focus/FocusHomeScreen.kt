@@ -39,14 +39,7 @@ fun FocusHomeScreen(viewModel: FocusViewModel, onExit: () -> Unit, onReport: (Lo
         state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         if (!state.ready) CircularProgressIndicator()
         else if (s != null && s.status in listOf(1, 2, 3)) {
-            val displayedSeconds = if (s.type == 1) state.elapsedSeconds else state.remainingSeconds
-            TimerDisplay(
-                title = state.tasks.firstOrNull { it.id == s.taskId }?.title ?: s.taskTitleSnapshot ?: "自由专注",
-                seconds = displayedSeconds,
-                status = when (s.status) { 1 -> "正在专注"; 2 -> "已暂停"; else -> "正在休息" },
-                progress = if (s.type == 0) (1f - state.remainingSeconds.toFloat() /
-                    (if (s.status == 3) s.restSeconds else s.plannedSeconds).coerceAtLeast(1)).coerceIn(0f, 1f) else null
-            )
+            LiveTimer(viewModel, s, state.tasks.firstOrNull { it.id == s.taskId }?.title ?: s.taskTitleSnapshot ?: "自由专注")
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)) {
                 if (s.status == 1) Button(onClick = viewModel::pause, enabled = !state.busy) { Text("暂停") }
                 if (s.status == 2) Button(onClick = viewModel::resume, enabled = !state.busy) { Text("继续") }
@@ -68,6 +61,15 @@ fun FocusHomeScreen(viewModel: FocusViewModel, onExit: () -> Unit, onReport: (Lo
     if (confirmEnd) AlertDialog(onDismissRequest = { confirmEnd = false }, title = { Text("结束本轮？") }, text = { Text("已完成的专注时间会保留。") },
         confirmButton = { TextButton(enabled = !state.busy, onClick = { confirmEnd = false; viewModel.finish() }) { Text("确认结束") } },
         dismissButton = { TextButton(onClick = { confirmEnd = false }) { Text("取消") } })
+}
+
+@Composable
+private fun LiveTimer(viewModel: FocusViewModel, session: com.focustrace.data.local.entity.FocusSessionEntity, title: String) {
+    val timer by viewModel.timer.collectAsStateWithLifecycle()
+    TimerDisplay(title = title, seconds = if (session.type == 1) timer.elapsedSeconds else timer.remainingSeconds,
+        status = when (session.status) { 1 -> "正在专注"; 2 -> "已暂停"; else -> "正在休息" },
+        progress = if (session.type == 0) (1f - timer.remainingSeconds.toFloat() /
+            (if (session.status == 3) session.restSeconds else session.plannedSeconds).coerceAtLeast(1)).coerceIn(0f, 1f) else null)
 }
 
 @Composable

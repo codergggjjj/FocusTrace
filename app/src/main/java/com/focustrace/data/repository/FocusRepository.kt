@@ -2,9 +2,13 @@ package com.focustrace.data.repository
 import com.focustrace.data.local.dao.FocusSessionDao
 import com.focustrace.data.local.dao.DistractionDao
 import com.focustrace.data.local.entity.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 class FocusRepository(private val sessions: FocusSessionDao, private val distractions: DistractionDao) {
-    fun reportFor(id: Long) = sessions.observeReport(id).map { it?.let(com.focustrace.focus.FocusReport::from) }
+    fun reportFor(id: Long) = sessions.observeReport(id).distinctUntilChanged()
+        .map { it?.let(com.focustrace.focus.FocusReport::from) }.flowOn(Dispatchers.Default)
     val allSessions = sessions.getAll()
     suspend fun create(session: FocusSessionEntity) = sessions.insert(session)
     suspend fun update(session: FocusSessionEntity) = sessions.update(session)

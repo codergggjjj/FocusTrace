@@ -5,9 +5,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -20,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.focustrace.data.local.entity.TaskEntity
 import com.focustrace.ui.components.*
 
 @Composable
@@ -33,6 +33,10 @@ fun TodoScreen(viewModel: TodoViewModel, onReport: (Long) -> Unit, onStarted: ()
     var categoryOpen by rememberSaveable { mutableStateOf(false) }
     var categoryName by rememberSaveable { mutableStateOf("") }
     var filter by rememberSaveable { mutableStateOf<Long?>(null) }
+    val onEditTask = remember { { id: Long -> editingId = id; editorOpen = true } }
+    val onDeleteTask = remember { { id: Long -> deletingId = id } }
+    val onToggleTask = remember(viewModel) { { task: TaskEntity -> viewModel.toggle(task) } }
+    val onStartTask = remember(viewModel, onStarted) { { id: Long -> viewModel.start(id, onStarted) } }
     Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         PageHeader("待办", "把注意力留给重要的事")
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -46,36 +50,20 @@ fun TodoScreen(viewModel: TodoViewModel, onReport: (Long) -> Unit, onStarted: ()
                     Text("返回计时 · ${session.taskTitleSnapshot ?: "自由专注"}")
                 }
             }
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = filter == null, onClick = { filter = null }, label = { Text("全部") })
-                data.categories.forEach { category ->
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                item(key = "all", contentType = "category") { FilterChip(selected = filter == null, onClick = { filter = null }, label = { Text("全部") }) }
+                items(data.categories, key = { it.id }, contentType = { "category" }) { category ->
                     FilterChip(selected = filter == category.id, onClick = { filter = category.id }, label = { Text(category.name) })
                 }
             }
-            val tasks = data.tasks.filter { filter == null || it.categoryId == filter }
-            Text("待完成 ${tasks.count { !it.completed }} · 已完成 ${tasks.count { it.completed }}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            val tasks = remember(data.tasks, filter) { if (filter == null) data.tasks else data.tasks.filter { it.categoryId == filter } }
+            val completedCount = remember(tasks) { tasks.count { it.completed } }
+            val categoryNames = remember(data.categories) { data.categories.associate { it.id to it.name } }
+            Text("待完成 ${tasks.size - completedCount} · 已完成 $completedCount", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (tasks.isEmpty()) InfoCard("给重要的事留一点时间", "还没有待办，给今天留一点专注的空间。")
             LazyColumn(Modifier.testTag("todo-list"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(tasks, key = { it.id }) { task ->
-                    Card(Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
-                        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(modifier = Modifier.testTag("complete-task-${task.id}"), checked = task.completed, onCheckedChange = { viewModel.toggle(task) }, enabled = !busy)
-                            Column(Modifier.weight(1f).clickable(enabled = !busy) { editingId = task.id; editorOpen = true }, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text(task.title, style = MaterialTheme.typography.titleLarge.copy(fontSize = 24.sp, lineHeight = 32.sp, fontWeight = FontWeight.Bold), textDecoration = if (task.completed) TextDecoration.LineThrough else null, color = if (task.completed) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
-                                Text("${data.categories.firstOrNull { it.id == task.categoryId }?.name ?: "未分类"} · ${if (task.timerType == 1) "正向计时" else "番茄钟 · ${task.targetMinutes} 分钟"}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                if (task.completed) Text("已完成")
-                            }
-                            TextButton(modifier = Modifier.testTag("delete-task-${task.id}"), onClick = { deletingId = task.id }, enabled = !busy, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)) { Text("删除") }
-                        }
-                        if (!task.completed) {
-                            Button(onClick = { viewModel.start(task.id, onStarted) }, enabled = !busy,
-                                modifier = Modifier.testTag("start-task-${task.id}").align(Alignment.End).padding(end = 12.dp, bottom = 12.dp)) {
-                                    Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
-                                    Spacer(Modifier.width(4.dp))
-                                    Text("开始")
-                                }
-                        }
-                    }
+                items(tasks, key = { it.id }, contentType = { "task" }) { task ->
+                    TaskCard(task, categoryNames[task.categoryId], busy, onEditTask, onToggleTask, onDeleteTask, onStartTask)
                 }
             }
             if (editorOpen) {
@@ -97,4 +85,29 @@ fun TodoScreen(viewModel: TodoViewModel, onReport: (Long) -> Unit, onStarted: ()
         confirmButton = { TextButton(enabled = !busy && categoryName.isNotBlank(), onClick = { viewModel.addCategory(categoryName) { categoryOpen = false; categoryName = "" } }) { Text("保存分类") } },
         dismissButton = { TextButton(enabled = !busy, onClick = { categoryOpen = false }) { Text("取消") } })
     error?.let { message -> AlertDialog(onDismissRequest = viewModel::clearError, title = { Text("操作未完成") }, text = { Text(message) }, confirmButton = { TextButton(onClick = viewModel::clearError) { Text("知道了") } }) }
+}
+
+/** Stable row inputs let unchanged visible tasks skip composition when page state changes. */
+@Composable
+private fun TaskCard(task: TaskEntity, categoryName: String?, busy: Boolean,
+    onEdit: (Long) -> Unit, onToggle: (TaskEntity) -> Unit, onDelete: (Long) -> Unit, onStart: (Long) -> Unit) {
+    Card(Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(modifier = Modifier.testTag("complete-task-${task.id}"), checked = task.completed, onCheckedChange = { onToggle(task) }, enabled = !busy)
+            Column(Modifier.weight(1f).clickable(enabled = !busy) { onEdit(task.id) }, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(task.title, style = MaterialTheme.typography.titleLarge.copy(fontSize = 24.sp, lineHeight = 32.sp, fontWeight = FontWeight.Bold), textDecoration = if (task.completed) TextDecoration.LineThrough else null, color = if (task.completed) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
+                Text("${categoryName ?: "未分类"} · ${if (task.timerType == 1) "正向计时" else "番茄钟 · ${task.targetMinutes} 分钟"}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (task.completed) Text("已完成")
+            }
+            TextButton(modifier = Modifier.testTag("delete-task-${task.id}"), onClick = { onDelete(task.id) }, enabled = !busy, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)) { Text("删除") }
+        }
+        if (!task.completed) {
+            Button(onClick = { onStart(task.id) }, enabled = !busy,
+                modifier = Modifier.testTag("start-task-${task.id}").align(Alignment.End).padding(end = 12.dp, bottom = 12.dp)) {
+                    Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("开始")
+                }
+        }
+    }
 }

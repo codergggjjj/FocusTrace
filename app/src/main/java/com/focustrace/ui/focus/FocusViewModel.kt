@@ -9,13 +9,16 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
 data class FocusUiState(val ready: Boolean = false, val session: FocusSessionEntity? = null,
-    val remainingSeconds: Long = 0, val elapsedSeconds: Long = 0, val tasks: List<TaskEntity> = emptyList(), val settings: UserSettings = UserSettings(),
+    val tasks: List<TaskEntity> = emptyList(), val settings: UserSettings = UserSettings(),
     val distractions: List<DistractionEventEntity> = emptyList(), val lifecycleError: String? = null,
     val busy: Boolean = false, val error: String? = null)
+data class TimerUiState(val remainingSeconds: Long = 0, val elapsedSeconds: Long = 0)
 class FocusViewModel(private val container: AppContainer) : ViewModel() {
     private val engine = container.pomodoro
     private val _state = MutableStateFlow(FocusUiState())
     val uiState = _state.asStateFlow()
+    private val _timer = MutableStateFlow(TimerUiState())
+    val timer = _timer.asStateFlow()
     init {
         viewModelScope.launch {
             container.lifecycle.error.collect { message -> _state.update { it.copy(lifecycleError = message) } }
@@ -34,10 +37,20 @@ class FocusViewModel(private val container: AppContainer) : ViewModel() {
                 .collect { (settings, tasks) -> _state.update { it.copy(settings = settings, tasks = tasks) } }
         }
         viewModelScope.launch {
-            while (isActive) {
-                try { refresh() } catch (e: CancellationException) { throw e }
-                catch (e: Exception) { _state.update { it.copy(error = "无法恢复专注记录，请重试") } }
-                delay(1000)
+            container.database.focusSessionDao().observeLatest().distinctUntilChanged()
+                .retryWhen { cause, _ ->
+                    if (cause is CancellationException) throw cause
+                    _state.update { it.copy(error = "无法恢复专注记录，请重试") }
+                    delay(1000)
+                    true
+                }.collectLatest { session ->
+                // Keep active timer transitions, but do not poll Room for paused/finished/absent sessions.
+                do {
+                    try { refresh() } catch (e: CancellationException) { throw e }
+                    catch (e: Exception) { _state.update { it.copy(error = "无法恢复专注记录，请重试") } }
+                    if (session?.status !in listOf(1, 3) || session?.backgroundWall != null) break
+                    delay(1000)
+                } while (isActive)
             }
         }
     }
@@ -45,8 +58,10 @@ class FocusViewModel(private val container: AppContainer) : ViewModel() {
         container.lifecycle.awaitEvents()
         val s = engine.refresh()
         val total = if (s?.status == 3) s.restSeconds else s?.plannedSeconds ?: 0
-        val remaining = if (s == null || s.status == 4) 0 else ((total * 1000 - engine.elapsed(s)).coerceAtLeast(0) + 999) / 1000
-        _state.update { it.copy(ready = true, session = s, remainingSeconds = remaining, elapsedSeconds = s?.let { session -> engine.elapsed(session) / 1000 } ?: 0) }
+        val elapsed = s?.let(engine::elapsed) ?: 0
+        val remaining = if (s == null || s.status == 4) 0 else ((total * 1000 - elapsed).coerceAtLeast(0) + 999) / 1000
+        _timer.value = TimerUiState(remaining, elapsed / 1000)
+        _state.update { it.copy(ready = true, session = s) }
     }
     private fun action(block: suspend () -> Unit) {
         if (_state.value.busy) return

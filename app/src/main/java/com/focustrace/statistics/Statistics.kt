@@ -30,7 +30,9 @@ data class StatisticsSummary(val range: StatisticsRange, val totals: StatisticsT
     val days: List<DailyStatistics>, val categories: List<CategoryStatistics>, val sessions: List<com.focustrace.data.local.entity.FocusSessionEntity>)
 
 fun summarizeStatistics(records: List<StatisticsRecord>, range: StatisticsRange): StatisticsSummary {
-    val eligible = records.filter { it.session.endTime != null && it.session.status in listOf(3, 4) && it.session.startTime >= range.startMillis && it.session.startTime < range.endMillis }
+    val startMillis = range.startMillis
+    val endMillis = range.endMillis
+    val eligible = records.filter { it.session.endTime != null && it.session.status in listOf(3, 4) && it.session.startTime >= startMillis && it.session.startTime < endMillis }
     fun totals(rows: List<StatisticsRecord>): StatisticsTotals {
         val focus = rows.sumOf { it.session.focusSeconds.coerceAtLeast(0) }
         val events = rows.flatMap { it.events }

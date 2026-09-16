@@ -15,6 +15,18 @@ android {
         versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
+    buildTypes {
+        // Installable non-debuggable build for on-device performance checks. Uses only the existing local debug key.
+        create("performance") {
+            initWith(getByName("release"))
+            isDebuggable = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = signingConfigs.getByName("debug")
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+            matchingFallbacks += "release"
+        }
+    }
     buildFeatures { compose = true }
     composeOptions { kotlinCompilerExtensionVersion = "1.5.14" }
     compileOptions {
@@ -50,4 +62,12 @@ dependencies {
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.1")
     androidTestImplementation("androidx.room:room-testing:2.6.1")
+}
+
+// Optional compiler evidence; outputs remain in ignored build/.
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    if (providers.gradleProperty("composeReports").orNull == "true") {
+        kotlinOptions.freeCompilerArgs += listOf(
+            "-P", "plugin:androidx.compose.compiler.plugins.kotlin:reportsDestination=${layout.buildDirectory.get().asFile}/compose-reports")
+    }
 }
