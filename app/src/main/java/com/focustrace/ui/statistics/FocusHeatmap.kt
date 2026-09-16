@@ -33,9 +33,10 @@ fun FocusHeatmap(summary: StatisticsSummary, onViewDay: (LocalDate) -> Unit) {
     var selected by rememberSaveable(summary.range.start.toString()) { mutableStateOf<String?>(null) }
     val colors = listOf(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.primary.copy(alpha = .18f),
         MaterialTheme.colorScheme.primary.copy(alpha = .36f), MaterialTheme.colorScheme.primary.copy(alpha = .65f), MaterialTheme.colorScheme.primary)
+    val today = LocalDate.now(summary.range.zone)
     val blanks = summary.range.start.dayOfWeek.value - 1
     TraceCard(Modifier.testTag("focus-heatmap")) {
-        Text("${summary.range.start.year} 年 ${summary.range.start.monthValue} 月 · 专注热力图", style = MaterialTheme.typography.titleLarge)
+        Text("专注日历 · ${summary.range.start.monthValue} 月", style = MaterialTheme.typography.titleMedium)
         Row(Modifier.fillMaxWidth()) { listOf("一", "二", "三", "四", "五", "六", "日").forEach {
             Text(it, Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
         } }
@@ -48,12 +49,12 @@ fun FocusHeatmap(summary: StatisticsSummary, onViewDay: (LocalDate) -> Unit) {
                     if (day == null) Spacer(Modifier.weight(1f).height(48.dp))
                     else {
                         val level = heatLevel(day.totals.focusSeconds)
-                        val future = day.date > LocalDate.now(summary.range.zone)
+                        val future = day.date > today
                         val fill = if (future) Color.Transparent else colors[level]
                         Box(Modifier.weight(1f).height(48.dp)
                             .background(fill, RoundedCornerShape(6.dp))
-                            .border(if (day.date == LocalDate.now(summary.range.zone)) 2.dp else 0.dp,
-                                if (day.date == LocalDate.now(summary.range.zone)) MaterialTheme.colorScheme.secondary else Color.Transparent, RoundedCornerShape(6.dp))
+                            .border(if (day.date == today) 2.dp else 0.dp,
+                                if (day.date == today) MaterialTheme.colorScheme.secondary else Color.Transparent, RoundedCornerShape(6.dp))
                             .testTag("heat-day-${day.date}")
                             .semantics { contentDescription = "${day.date}，有效学习 ${formatDuration(day.totals.focusSeconds)}" }
                             .clickable(enabled = !future) { selected = day.date.toString() },
@@ -71,7 +72,7 @@ fun FocusHeatmap(summary: StatisticsSummary, onViewDay: (LocalDate) -> Unit) {
             colors.forEach { Box(Modifier.size(16.dp).background(it, RoundedCornerShape(3.dp))) }
             Text("多", style = MaterialTheme.typography.bodySmall)
         }
-        Text("0、少于30分钟、30–59分钟、1–2小时、2小时及以上。点击日期查看详情。", style = MaterialTheme.typography.bodySmall)
+        Text("点击日期查看当天记录", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
     val day = summary.days.firstOrNull { it.date.toString() == selected }
     if (day != null) AlertDialog(onDismissRequest = { selected = null },

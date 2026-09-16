@@ -85,12 +85,19 @@ class FoundationTest {
             compose.onNodeWithText("月份（yyyy-MM）").performTextReplacement("2024-06")
             compose.onNodeWithText("查看").performClick()
             compose.onNodeWithTag("statistics-list").performScrollToNode(hasTestTag("study-total"))
-            compose.waitUntil(5000) { compose.onAllNodesWithText("1 时 30 分 0 秒").fetchSemanticsNodes().isNotEmpty() }
-            compose.onNodeWithTag("study-total").assertTextEquals("1 时 30 分 0 秒")
+            compose.waitUntil(5000) { compose.onAllNodesWithText("1 小时 30 分").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithTag("study-total").assertTextEquals("1 小时 30 分")
+            if (androidx.test.platform.app.InstrumentationRegistry.getArguments().getString("captureStatistics") == "true") {
+                compose.onNodeWithTag("statistics-list").performScrollToIndex(0)
+                val command = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation
+                    .executeShellCommand("screencap -p /sdcard/Download/FocusTrace-statistics.png")
+                android.os.ParcelFileDescriptor.AutoCloseInputStream(command).use { it.readBytes() }
+            }
             compose.onNodeWithTag("statistics-list").performScrollToNode(hasTestTag("heat-day-2024-06-12"))
             compose.onNodeWithTag("heat-day-2024-06-12").performClick()
             compose.onNodeWithText("学习时间：1 时 0 分 0 秒").assertIsDisplayed()
             compose.onNodeWithText("查看当天记录").performClick()
+            compose.onNodeWithText("关闭记录").performClick()
             compose.onNodeWithTag("statistics-list").performScrollToNode(hasTestTag("statistics-range"))
             compose.onNodeWithTag("statistics-range").assertTextEquals("2024-06-12")
             compose.onNodeWithTag("statistics-list").performScrollToNode(hasText("今日"))
@@ -99,9 +106,10 @@ class FoundationTest {
             compose.onNodeWithText("日期（yyyy-MM-dd）").performTextReplacement("2024-06-12")
             compose.onNodeWithText("查看").performClick()
             compose.onNodeWithTag("statistics-list").performScrollToNode(hasTestTag("study-total"))
-            compose.waitUntil(5000) { compose.onAllNodesWithText("1 时 0 分 0 秒").fetchSemanticsNodes().isNotEmpty() }
-            compose.onNodeWithTag("study-total").assertTextEquals("1 时 0 分 0 秒")
-            compose.onNodeWithTag("statistics-list").performScrollToNode(hasTestTag("study-session-$firstId"))
+            compose.waitUntil(5000) { compose.onAllNodesWithText("1 小时 0 分").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithTag("study-total").assertTextEquals("1 小时 0 分")
+            compose.onNodeWithText("查看专注记录").performClick()
+            compose.onNodeWithTag("statistics-records").performScrollToNode(hasTestTag("study-session-$firstId"))
             compose.onNodeWithText("开始：2024-06-12 22:00:00").assertExists()
             compose.onNodeWithText("结束：2024-06-13 00:00:00").assertExists()
             compose.onNodeWithTag("study-session-$firstId").performClick()
@@ -152,18 +160,20 @@ class FoundationTest {
     @Test fun statisticsPeriodsAndHistorySurviveRecreation() {
         compose.onAllNodesWithText("统计").onFirst().performClick()
         compose.onNodeWithText("本月").performClick()
-        compose.onNodeWithText("下一月").assertIsNotEnabled()
-        compose.onNodeWithText("上一月").performClick()
+        compose.onNodeWithContentDescription("下一月").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("上一月").performClick()
         val start = java.time.LocalDate.now().withDayOfMonth(1).minusMonths(1)
-        val label = "$start 至 ${start.plusMonths(1).minusDays(1)}"
+        val label = "${start.year} 年 ${start.monthValue} 月"
         compose.waitUntil(5000) { compose.onAllNodesWithText(label).fetchSemanticsNodes().isNotEmpty() }
         compose.activityRule.scenario.recreate()
         compose.onNodeWithText(label).assertIsDisplayed()
-        compose.onNodeWithText("下一月").assertIsEnabled()
+        compose.onNodeWithContentDescription("下一月").assertIsEnabled()
+        compose.onNodeWithTag("statistics-list").performScrollToNode(hasText("回到本月"))
         compose.onNodeWithText("回到本月").performClick()
-        compose.onNodeWithText("下一月").assertIsNotEnabled()
+        compose.onNodeWithTag("statistics-list").performScrollToIndex(0)
+        compose.onNodeWithContentDescription("下一月").assertIsNotEnabled()
         compose.onNodeWithText("本周").performClick()
-        compose.onNodeWithText("上一周").assertIsDisplayed()
+        compose.onNodeWithContentDescription("上一周").assertIsDisplayed()
     }
 
     @Test fun stopwatchTaskPersistsAndSelectsStopwatchWhenStarting() {

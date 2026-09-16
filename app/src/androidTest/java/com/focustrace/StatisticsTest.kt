@@ -24,6 +24,18 @@ class StatisticsTest {
             if (duration == 0L) emptyList() else listOf(DistractionEventEntity(id, id, start + 10000, start + 10000 + duration * 1000, duration)), null)
     }
 
+    @Test fun hourlyChartUsesStartHourAndKeepsEffectiveTotals() {
+        val source = row(1, 3600, 20)
+        val start = date.atTime(22, 30).atZone(zone).toInstant().toEpochMilli()
+        val session = source.copy(session = source.session.copy(startTime = start, endTime = start + 7200000))
+        val result = summarizeStatistics(listOf(session), statisticsRange(date, StatisticsPeriod.DAY, zone))
+        assertEquals(24, result.hours.size)
+        assertEquals(3600L, result.hours[22].focusSeconds)
+        assertEquals(20L, result.hours[22].distractionSeconds)
+        assertEquals(result.totals.focusSeconds, result.hours.sumOf { it.focusSeconds })
+        assertEquals(0L, result.hours[23].focusSeconds)
+    }
+
     @Test fun heatmapThresholdsAreStable() {
         assertEquals(listOf(0, 1, 1, 2, 2, 3, 3, 4),
             listOf(0L, 1L, 1799L, 1800L, 3599L, 3600L, 7199L, 7200L).map { com.focustrace.ui.statistics.heatLevel(it) })

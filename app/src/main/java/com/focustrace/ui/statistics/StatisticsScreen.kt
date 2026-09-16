@@ -1,177 +1,96 @@
 package com.focustrace.ui.statistics
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.items
-import java.time.*
-import java.time.format.DateTimeFormatter
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.focustrace.focus.formatDuration
 import com.focustrace.statistics.*
 import com.focustrace.ui.components.*
+import java.time.*
 
 @Composable
 fun StatisticsScreen(viewModel: StatisticsViewModel, onReport: (Long) -> Unit) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val selection by viewModel.selection.collectAsStateWithLifecycle()
     val heatmap by viewModel.heatmap.collectAsStateWithLifecycle()
-    val formatter = remember(selection.range.zone) { DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(selection.range.zone) }
     var showDate by rememberSaveable { mutableStateOf(false) }
+    var showRecords by rememberSaveable { mutableStateOf(false) }
+    var showDetails by rememberSaveable { mutableStateOf(false) }
+    var showRules by rememberSaveable { mutableStateOf(false) }
     if (showDate) PeriodDateDialog(selection, onDismiss = { showDate = false }) {
         viewModel.selectDate(it); showDate = false
     }
+    if (showRecords) StudyRecordsDialog(state, onDismiss = { showRecords = false }, onRetry = viewModel::retry) {
+        showRecords = false; onReport(it)
+    }
+    val summary = (state as? LoadState.Ready)?.value
+    if (showDetails && summary != null) FocusDetailsDialog(summary.totals) { showDetails = false }
+    if (showRules) AlertDialog(onDismissRequest = { showRules = false }, title = { Text("统计说明") },
+        text = { Text("学习时间为有效专注时长，不含暂停和分心。记录按开始日归属；日视图的时段按开始小时归属，不代表实际逐小时分配。周一为每周起点。\n\n专注率 = 有效专注 ÷（有效专注 + 分心时间）。首次分心均值仅统计发生过分心的记录。分类按待办当前分类汇总。") },
+        confirmButton = { TextButton(onClick = { showRules = false }) { Text("知道了") } })
     LazyColumn(Modifier.fillMaxSize().testTag("statistics-list"), contentPadding = PaddingValues(20.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item(key = "header", contentType = "header") {
-            PageHeader("统计", "看见专注，也理解分心")
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("统计", style = MaterialTheme.typography.headlineLarge)
+                    Text("看见专注，也理解分心", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                IconButton(onClick = { showRules = true }) { Icon(Icons.Outlined.Info, contentDescription = "统计说明") }
+            }
         }
         item(key = "period", contentType = "period") {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 StatisticsPeriod.entries.forEach { period ->
-                    FilterChip(selected = selection.period == period, onClick = { viewModel.choose(period) }, label = { Text(period.label) })
+                    FilterChip(modifier = Modifier.weight(1f), selected = selection.period == period,
+                        onClick = { viewModel.choose(period) }, label = { Text(period.label) })
                 }
             }
-            TextButton(onClick = { showDate = true }) { Text(if (selection.period == StatisticsPeriod.MONTH) "选择月份" else "选择日期") }
-            Text(if (selection.period == StatisticsPeriod.DAY) selection.range.start.toString()
-                else "${selection.range.start} 至 ${selection.range.endExclusive.minusDays(1)}",
-                modifier = Modifier.testTag("statistics-range"))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                TextButton(onClick = { viewModel.shift(-1) }) { Text("上一${selection.period.unit}") }
-                TextButton(onClick = viewModel::current) { Text("回到${selection.period.label}") }
-                TextButton(onClick = { viewModel.shift(1) }, enabled = selection.canNext) { Text("下一${selection.period.unit}") }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { viewModel.shift(-1) }) { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, "上一${selection.period.unit}") }
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(if (selection.period == StatisticsPeriod.DAY) selection.range.start.toString()
+                        else if (selection.period == StatisticsPeriod.MONTH) "${selection.range.start.year} 年 ${selection.range.start.monthValue} 月"
+                        else "${selection.range.start} 至 ${selection.range.endExclusive.minusDays(1)}",
+                        style = MaterialTheme.typography.titleSmall, modifier = Modifier.testTag("statistics-range"))
+                    TextButton(onClick = { showDate = true }, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                        Text(if (selection.period == StatisticsPeriod.MONTH) "选择月份" else "选择日期")
+                    }
+                }
+                IconButton(onClick = { viewModel.shift(1) }, enabled = selection.canNext) { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, "下一${selection.period.unit}") }
             }
         }
         when (val value = state) {
-            LoadState.Loading -> item(key = "loading", contentType = "loading") { CircularProgressIndicator() }
-            is LoadState.Error -> item(key = "error", contentType = "error") {
-                Text(value.message)
-                Button(onClick = viewModel::retry) { Text("重试") }
-            }
+            LoadState.Loading -> item(key = "loading") { LinearProgressIndicator(Modifier.fillMaxWidth()) }
+            is LoadState.Error -> item(key = "error") { Text(value.message); TextButton(onClick = viewModel::retry) { Text("重试") } }
             is LoadState.Ready -> {
-                val summary = value.value
-                item(key = "totals", contentType = "totals") {
-                    val totals = summary.totals
-                    TraceCard {
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text("累计学习时间", style = MaterialTheme.typography.titleLarge)
-                            Text(formatDuration(totals.focusSeconds), modifier = Modifier.testTag("study-total"), style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                                SummaryMetric("专注次数", "${totals.sessions} 次", Modifier.weight(1f))
-                                SummaryMetric("完成番茄", "${totals.pomodoros} 个", Modifier.weight(1f))
-                            }
-                            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                                SummaryMetric("分心次数", "${totals.distractions} 次", Modifier.weight(1f))
-                                SummaryMetric("分心时间", formatDuration(totals.distractionSeconds), Modifier.weight(1f))
-                            }
-                            Metric("专注率", totals.focusPercent?.let { "$it%" } ?: "—")
-                            Metric("平均分心时长", totals.averageDistractionSeconds?.let(::formatDuration) ?: "—")
-                            Metric("平均首次分心时间", totals.averageFirstDistractionSeconds?.let(::formatDuration) ?: "—")
-                        }
-                    }
+                item(key = "overview", contentType = "overview") {
+                    StudyOverview(value.value.totals, onRecords = { showRecords = true }, onDetails = { showDetails = true })
                 }
-                if (summary.totals.sessions == 0) item(key = "empty", contentType = "text") { Text("这段时间暂无已结束的专注记录，完成一次专注后再来看看。") }
+                item(key = "chart", contentType = "chart") { StudyTrend(value.value, selection.period) }
                 item(key = "heatmap", contentType = "heatmap") {
                     when (val calendar = heatmap) {
-                        is LoadState.Ready -> FocusHeatmap(calendar.value, onViewDay = viewModel::viewDay)
+                        is LoadState.Ready -> FocusHeatmap(calendar.value) { viewModel.viewDay(it); showRecords = true }
                         is LoadState.Error -> TextButton(onClick = viewModel::retry) { Text("热力图加载失败，点击重试") }
                         LoadState.Loading -> LinearProgressIndicator(Modifier.fillMaxWidth())
                     }
                 }
-                item(key = "sessions-header", contentType = "section-header") {
-                    Text("学习记录 · ${summary.sessions.size} 次", style = MaterialTheme.typography.titleLarge)
-                    Text("累计时间为有效专注时长；起止区间可能包含暂停和分心。", style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                items(summary.sessions, key = { "session-${it.id}" }, contentType = { "session" }) { session ->
-                    TraceCard(Modifier.testTag("study-session-${session.id}").clickable { onReport(session.id) }) {
-                        Text(session.taskTitleSnapshot ?: "自由专注 / 原待办不可用", style = MaterialTheme.typography.titleMedium)
-                        Text("开始：${formatter.format(Instant.ofEpochMilli(session.startTime))}")
-                        Text("结束：${formatter.format(Instant.ofEpochMilli(session.endTime!!))}")
-                        Text("${if (session.type == 0) "番茄钟" else "正向计时"} · 有效学习 ${formatDuration(session.focusSeconds)}",
-                            color = MaterialTheme.colorScheme.primary)
-                        Text("查看本次报告", style = MaterialTheme.typography.labelLarge)
-                    }
-                }
-                item(key = "chart", contentType = "chart") { DailyChart(summary) }
-                item(key = "categories-header", contentType = "section-header") {
-                    Text("分类统计", style = MaterialTheme.typography.titleLarge)
-                    Text("按待办当前分类汇总；无关联待办的记录归入未分类。", style = MaterialTheme.typography.bodySmall)
-                }
-                items(summary.categories, key = { "category-${it.id}" }, contentType = { "category" }) { category ->
-                    Metric(category.name, "${formatDuration(category.focusSeconds)} · ${category.sessions} 次")
-                }
-                item(key = "footnote", contentType = "text") { Text("记录归入开始当天，周一为每周起点。专注率 = 总有效专注 /（总有效专注 + 总分心时间）。首次分心均值仅包含发生过分心的记录。", style = MaterialTheme.typography.bodySmall) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun Metric(label: String, value: String) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text(label, Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-        Text(value, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
-    }
-}
-
-@Composable
-private fun DailyChart(summary: StatisticsSummary) {
-    var metric by rememberSaveable { mutableIntStateOf(0) }
-    var selectedDay by rememberSaveable(summary.range.start.toString(), summary.days.size) { mutableIntStateOf(0) }
-    val labels = listOf("专注时间", "分心次数", "分心时间")
-    fun amount(day: DailyStatistics): Long = when (metric) {
-        0 -> day.totals.focusSeconds
-        1 -> day.totals.distractions.toLong()
-        else -> day.totals.distractionSeconds
-    }
-    fun display(day: DailyStatistics) = if (metric == 1) "${amount(day)} 次" else formatDuration(amount(day))
-    val maximum = remember(summary.days, metric) { summary.days.maxOfOrNull(::amount)?.coerceAtLeast(1) ?: 1 }
-    TraceCard {
-        Text("每日趋势", style = MaterialTheme.typography.titleLarge)
-        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            labels.forEachIndexed { index, label ->
-                FilterChip(selected = metric == index, onClick = { metric = index }, label = { Text(label) })
-            }
-        }
-        LazyRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.Bottom) {
-            itemsIndexed(summary.days, key = { _, day -> day.date.toEpochDay() }, contentType = { _, _ -> "bar" }) { index, day ->
-                Column(Modifier.width(48.dp).semantics { contentDescription = "${day.date} ${labels[metric]} ${display(day)}" }
-                    .clickable { selectedDay = index }, horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(Modifier.height(120.dp).fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
-                        Box(Modifier.width(24.dp).height((120f * amount(day).toDouble() / maximum).toFloat().dp)
-                            .background(if (selectedDay == index) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary))
-                    }
-                    Text("${day.date.monthValue}/${day.date.dayOfMonth}", style = MaterialTheme.typography.labelSmall)
+                item(key = "categories", contentType = "categories") { CategoryBreakdown(value.value.categories) }
+                item(key = "current", contentType = "current") {
+                    TextButton(onClick = viewModel::current, modifier = Modifier.fillMaxWidth()) { Text("回到${selection.period.label}") }
                 }
             }
         }
-        summary.days.getOrNull(selectedDay)?.let { Text("${it.date} · ${labels[metric]}：${display(it)}") }
-        Text("点击柱形查看数值，左右滑动查看更多日期。", style = MaterialTheme.typography.bodySmall)
-    }
-}
-
-@Composable
-private fun SummaryMetric(label: String, value: String, modifier: Modifier) {
-    Column(modifier.padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, style = MaterialTheme.typography.titleLarge)
     }
 }
 
