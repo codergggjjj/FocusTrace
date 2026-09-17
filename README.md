@@ -2,11 +2,11 @@
 
 记录每一次专注，也看见每一次分心。
 
-[下载 FocusTrace v1.0.3 APK](https://github.com/codergggjjj/FocusTrace/releases/download/v1.0.3/FocusTrace-v1.0.3-performance.apk) · [发布范围与说明](docs/release-v1.0.3.md)
+[下载 FocusTrace v1.0.5 APK](https://github.com/codergggjjj/FocusTrace/releases/download/v1.0.5/FocusTrace-v1.0.5-performance.apk) · [发布范围与说明](docs/release-v1.0.5.md)
 
 此版本使用 debug 签名，面向 Android 8.0 及以上，按当前已实现功能发布。
 
-基于 [design.md](design.md) 的完全本地原生 Android 应用。已完成待办 CRUD、番茄钟、正向计时、前后台分心检测、单次专注报告和日/周/月统计。v1.0.1 已移除任务分类，让创建与查看待办更直接。
+基于 [design.md](design.md) 的完全本地原生 Android 应用。已完成待办 CRUD、番茄钟、正向计时、前后台分心检测、暂停时长提示、单次专注报告和日/周/月统计。当前 v1.0.5 仅将严格超过 5 分钟的单次专注计入统计，较短记录仍保留在历史中。
 
 ## 在 Android Studio 中运行
 
