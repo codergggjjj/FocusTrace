@@ -20,6 +20,75 @@ import org.junit.runner.RunWith
 class FoundationTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
 
+    @Test fun todoEditorPrefillsTaskAndCurrentTimeForManualRecord() {
+        val app = ApplicationProvider.getApplicationContext<FocusTraceApplication>()
+        val db = app.container.database
+        val taskId = runBlocking { db.taskDao().insert(TaskEntity(title = "学习操作系统补录验证", targetMinutes = 25, createdAt = System.currentTimeMillis(), updatedAt = 1)) }
+        try {
+            compose.onNodeWithTag("todo-list").performScrollToNode(hasText("学习操作系统补录验证"))
+            compose.onNodeWithText("学习操作系统补录验证").performClick()
+            val before = java.time.LocalDateTime.now().withSecond(0).withNano(0)
+            compose.onNodeWithText("添加专注记录").performScrollTo().performClick()
+            val after = java.time.LocalDateTime.now().withSecond(0).withNano(0)
+            val field = compose.onNodeWithText("开始时间（HH:mm）").fetchSemanticsNode()
+            val entered = field.config[androidx.compose.ui.semantics.SemanticsProperties.EditableText].text
+            val format = java.time.format.DateTimeFormatter.ofPattern("HH:mm")
+            assertTrue(entered == before.format(format) || entered == after.format(format))
+            compose.onNodeWithText("对应任务：学习操作系统补录验证").assertExists()
+            compose.onNodeWithText("开始时间（HH:mm）").performTextReplacement("14:00")
+            compose.onNodeWithText("专注时长（分钟）").performTextReplacement("120")
+            compose.onNodeWithText("结束时间（自动计算）").assertTextContains("16:00")
+            compose.activityRule.scenario.recreate()
+            compose.onNodeWithText("保存记录").performClick()
+            compose.waitUntil(5000) { compose.onAllNodesWithText("专注时长（分钟）").fetchSemanticsNodes().isEmpty() }
+            val row = runBlocking { db.focusSessionDao().getAll().first().single { it.taskId == taskId } }
+            assertEquals("MANUAL", row.source)
+            assertEquals(7200L, row.focusSeconds)
+            assertEquals(7200L, runBlocking { app.container.focusRepository.taskFocusSeconds(taskId).first() })
+        } finally {
+            runBlocking {
+                db.focusSessionDao().getAll().first().filter { it.taskId == taskId }.forEach { db.focusSessionDao().delete(it) }
+                db.taskDao().getTask(taskId)?.let { db.taskDao().delete(it) }
+            }
+        }
+    }
+
+    @Test fun manualRecordCanBeAddedEditedAndDeletedFromHistory() {
+        val db = ApplicationProvider.getApplicationContext<FocusTraceApplication>().container.database
+        var manualId: Long? = null
+        try {
+            compose.onAllNodesWithText("统计").onFirst().performClick()
+            compose.onNodeWithText("查看专注记录").performClick()
+            compose.onNodeWithText("手动添加记录").performClick()
+            compose.onNodeWithText("日期（yyyy-MM-dd）").performTextReplacement("2024-06-12")
+            compose.onNodeWithText("开始时间（HH:mm）").performTextReplacement("14:00")
+            compose.onNodeWithText("专注时长（分钟）").performTextReplacement("0")
+            compose.onNodeWithText("保存记录").assertIsNotEnabled()
+            compose.onNodeWithText("专注时长（分钟）").performTextReplacement("120")
+            compose.onNodeWithText("专注时长：2 时 0 分 0 秒").assertExists()
+            compose.onNodeWithText("备注（可选）").performScrollTo().performTextInput("手动界面验证")
+            compose.activityRule.scenario.recreate()
+            compose.onNodeWithText("保存记录").performClick()
+            compose.waitUntil(5000) { compose.onAllNodesWithText("添加专注记录").fetchSemanticsNodes().isEmpty() }
+            manualId = runBlocking { db.focusSessionDao().getAll().first().single { it.note == "手动界面验证" }.id }
+            compose.onNodeWithTag("statistics-records").performScrollToNode(hasTestTag("study-session-$manualId"))
+            compose.onNodeWithTag("study-session-$manualId").performClick()
+            compose.onNodeWithText("专注时长（分钟）").performTextReplacement("60")
+            compose.onNodeWithText("保存记录").performClick()
+            compose.waitUntil(5000) { compose.onAllNodesWithText("编辑专注记录").fetchSemanticsNodes().isEmpty() }
+            assertEquals(3600L, runBlocking { db.focusSessionDao().getSession(manualId!!)!!.focusSeconds })
+            compose.onNodeWithTag("study-session-$manualId").performClick()
+            compose.onNodeWithText("删除记录").performScrollTo().performClick()
+            compose.onNodeWithText("保留记录").performClick()
+            compose.onNodeWithText("删除记录").performClick()
+            compose.onNodeWithText("确认删除记录").performClick()
+            compose.waitUntil(5000) { compose.onAllNodesWithTag("study-session-$manualId").fetchSemanticsNodes().isEmpty() }
+            assertNull(runBlocking { db.focusSessionDao().getSession(manualId!!) })
+        } finally {
+            runBlocking { manualId?.let { db.focusSessionDao().getSession(it)?.let { row -> db.focusSessionDao().delete(row) } } }
+        }
+    }
+
     @Test fun realScreenOffDoesNotCreateDistraction() {
         val app = ApplicationProvider.getApplicationContext<FocusTraceApplication>()
         val container = app.container

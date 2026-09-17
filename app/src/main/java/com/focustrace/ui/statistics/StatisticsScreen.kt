@@ -27,13 +27,26 @@ fun StatisticsScreen(viewModel: StatisticsViewModel, onReport: (Long) -> Unit) {
     var showRecords by rememberSaveable { mutableStateOf(false) }
     var showDetails by rememberSaveable { mutableStateOf(false) }
     var showRules by rememberSaveable { mutableStateOf(false) }
+    var editorOpen by rememberSaveable { mutableStateOf(false) }
+    var editingId by rememberSaveable { mutableStateOf<Long?>(null) }
+    val tasks by viewModel.tasks.collectAsStateWithLifecycle()
+    val busy by viewModel.saving.collectAsStateWithLifecycle()
+    val editError by viewModel.editError.collectAsStateWithLifecycle()
     if (showDate) PeriodDateDialog(selection, onDismiss = { showDate = false }) {
         viewModel.selectDate(it); showDate = false
     }
-    if (showRecords) StudyRecordsDialog(state, onDismiss = { showRecords = false }, onRetry = viewModel::retry) {
+    if (showRecords) StudyRecordsDialog(state, onDismiss = { showRecords = false }, onRetry = viewModel::retry,
+        onAdd = { editingId = null; viewModel.clearEditError(); editorOpen = true },
+        onEdit = { editingId = it; viewModel.clearEditError(); editorOpen = true }) {
         showRecords = false; onReport(it)
     }
     val summary = (state as? LoadState.Ready)?.value
+    val editedRecord = summary?.sessions?.firstOrNull { it.id == editingId }
+    if (editorOpen && (editingId == null || editedRecord != null)) ManualRecordDialog(
+        editedRecord, tasks, busy, editError, onDismiss = { editorOpen = false },
+        onSave = { date, start, end, task, note ->
+            viewModel.saveManual(editingId, date, start, end, task, note) { editorOpen = false }
+        }, onDelete = { editingId?.let { viewModel.deleteManual(it) { editorOpen = false; editingId = null } } })
     if (showDetails && summary != null) FocusDetailsDialog(summary.totals) { showDetails = false }
     if (showRules) AlertDialog(onDismissRequest = { showRules = false }, title = { Text("统计说明") },
         text = { Text("学习时间为有效专注时长，不含暂停和分心。记录按开始日归属；日视图的时段按开始小时归属，不代表实际逐小时分配。周一为每周起点。\n\n专注率 = 有效专注 ÷（有效专注 + 分心时间）。首次分心均值仅统计发生过分心的记录。") },

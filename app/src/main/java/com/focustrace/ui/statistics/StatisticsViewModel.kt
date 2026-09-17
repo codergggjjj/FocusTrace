@@ -12,7 +12,32 @@ import java.time.*
 
 data class StatisticsSelection(val period: StatisticsPeriod, val range: StatisticsRange, val canNext: Boolean)
 @OptIn(ExperimentalCoroutinesApi::class)
-class StatisticsViewModel(repository: StatisticsRepository, private val savedState: SavedStateHandle = SavedStateHandle()) : ViewModel() {
+class StatisticsViewModel(repository: StatisticsRepository,
+    private val focusRepository: com.focustrace.data.repository.FocusRepository,
+    taskRepository: com.focustrace.data.repository.TaskRepository,
+    private val savedState: SavedStateHandle = SavedStateHandle()) : ViewModel() {
+    val tasks = taskRepository.allTasks.asLoadState()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), LoadState.Loading)
+    val saving = MutableStateFlow(false)
+    val editError = MutableStateFlow<String?>(null)
+    fun clearEditError() { editError.value = null }
+    private fun changeRecord(onSuccess: () -> Unit, action: suspend () -> Unit) {
+        if (saving.value) return
+        saving.value = true
+        editError.value = null
+        viewModelScope.launch {
+            try { action(); onSuccess() }
+            catch (e: CancellationException) { throw e }
+            catch (e: Exception) { editError.value = e.message ?: "保存失败，请重试" }
+            finally { saving.value = false }
+        }
+    }
+    fun saveManual(id: Long?, date: String, start: String, end: String, taskId: Long?, note: String, onSuccess: () -> Unit) =
+        changeRecord(onSuccess) {
+            focusRepository.saveManual(id, date, start, end, taskId, note)
+            viewDay(LocalDate.parse(date.trim()))
+        }
+    fun deleteManual(id: Long, onSuccess: () -> Unit) = changeRecord(onSuccess) { focusRepository.deleteManual(id) }
     private val period = savedState.getStateFlow("statisticsPeriod", StatisticsPeriod.DAY.name)
     private val anchor = savedState.getStateFlow<Long?>("statisticsAnchor", null)
     private val reload = MutableStateFlow(0)

@@ -15,7 +15,8 @@ import com.focustrace.data.local.entity.TaskEntity
 
 @Composable
 fun TaskEditScreen(task: TaskEntity?, busy: Boolean, defaultMinutes: Int,
-    onDelete: () -> Unit, onDismiss: () -> Unit, onSave: (String, Int, Int) -> Unit) {
+    onDelete: () -> Unit, onDismiss: () -> Unit, onSave: (String, Int, Int) -> Unit,
+    onAddRecord: () -> Unit) {
     var title by rememberSaveable(task?.id) { mutableStateOf(task?.title ?: "") }
     var minutes by rememberSaveable(task?.id) { mutableStateOf(task?.targetMinutes?.toString() ?: defaultMinutes.toString()) }
     var timerType by rememberSaveable(task?.id) { mutableIntStateOf(task?.timerType ?: 0) }
@@ -38,6 +39,7 @@ fun TaskEditScreen(task: TaskEntity?, busy: Boolean, defaultMinutes: Int,
                     isError = duration == null || duration !in 1..1440,
                     supportingText = { Text("请输入 1–1440 分钟") })
                 if (task != null) {
+                    OutlinedButton(onClick = onAddRecord, enabled = !busy) { Text("添加专注记录") }
                     TextButton(onClick = onDelete, enabled = !busy,
                         modifier = Modifier.testTag("delete-task-${task.id}"),
                         colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {

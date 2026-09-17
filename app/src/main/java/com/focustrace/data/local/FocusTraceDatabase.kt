@@ -4,13 +4,19 @@ import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.focustrace.data.local.dao.*
 import com.focustrace.data.local.entity.*
-@Database(entities = [CategoryEntity::class, TaskEntity::class, FocusSessionEntity::class, DistractionEventEntity::class], version = 6, exportSchema = true)
+@Database(entities = [CategoryEntity::class, TaskEntity::class, FocusSessionEntity::class, DistractionEventEntity::class], version = 7, exportSchema = true)
 abstract class FocusTraceDatabase : RoomDatabase() {
     abstract fun taskDao(): TaskDao
     abstract fun categoryDao(): CategoryDao
     abstract fun focusSessionDao(): FocusSessionDao
     abstract fun distractionDao(): DistractionDao
     companion object {
+        val Migration6To7 = object : androidx.room.migration.Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE focus_sessions ADD COLUMN source TEXT NOT NULL DEFAULT 'TIMER'")
+                db.execSQL("ALTER TABLE focus_sessions ADD COLUMN note TEXT DEFAULT NULL")
+            }
+        }
         val Migration1To2 = object : androidx.room.migration.Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 mapOf("elapsedMillis" to "0", "anchorWall" to "0", "anchorElapsed" to "0", "bootCount" to "-1", "restSeconds" to "300", "autoBreak" to "1", "autoFocus" to "0").forEach { (name, value) ->

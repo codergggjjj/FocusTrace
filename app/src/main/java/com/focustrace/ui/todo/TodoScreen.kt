@@ -29,6 +29,7 @@ fun TodoScreen(viewModel: TodoViewModel, onReport: (Long) -> Unit, onStarted: ()
     var editingId by rememberSaveable { mutableStateOf<Long?>(null) }
     var editorOpen by rememberSaveable { mutableStateOf(false) }
     var deletingId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var recordTaskId by rememberSaveable { mutableStateOf<Long?>(null) }
     val onEditTask = remember { { id: Long -> editingId = id; editorOpen = true } }
     val onToggleTask = remember(viewModel) { { task: TaskEntity -> viewModel.toggle(task) } }
     val onStartTask = remember(viewModel, onStarted) { { id: Long -> viewModel.start(id, onStarted) } }
@@ -54,9 +55,18 @@ fun TodoScreen(viewModel: TodoViewModel, onReport: (Long) -> Unit, onStarted: ()
             if (editorOpen) {
                 val original = data.tasks.firstOrNull { it.id == editingId }
                 TaskEditScreen(original, busy, data.defaultMinutes,
+                    onAddRecord = { recordTaskId = original?.id },
                     onDelete = { deletingId = original?.id },
                     onDismiss = { editorOpen = false },
                     onSave = { title, minutes, timerType -> viewModel.save(original, title, minutes, timerType) { editorOpen = false } })
+            }
+            recordTaskId?.let { taskId ->
+                com.focustrace.ui.statistics.ManualRecordDialog(
+                    record = null, tasks = LoadState.Ready(data.tasks), busy = busy, error = null,
+                    defaultTaskId = taskId, onDismiss = { recordTaskId = null },
+                    onSave = { date, start, end, selectedTask, note ->
+                        viewModel.addManual(date, start, end, selectedTask, note) { recordTaskId = null }
+                    }, onDelete = {})
             }
             data.tasks.firstOrNull { it.id == deletingId }?.let { task ->
                 AlertDialog(onDismissRequest = { if (!busy) deletingId = null }, title = { Text("删除待办？") },

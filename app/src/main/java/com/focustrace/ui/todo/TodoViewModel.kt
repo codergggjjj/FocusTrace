@@ -47,6 +47,10 @@ class TodoViewModel(private val container: com.focustrace.data.AppContainer) : V
     private val _error = MutableStateFlow<String?>(null)
     val error = _error.asStateFlow()
     fun clearError() { _error.value = null }
+    fun addManual(date: String, start: String, end: String, taskId: Long?, note: String, done: () -> Unit) = write {
+        container.focusRepository.saveManual(null, date, start, end, taskId, note)
+        done()
+    }
     private fun write(action: suspend () -> Unit) {
         if (_busy.value) return
         _busy.value = true

@@ -19,8 +19,10 @@ import java.time.Instant
 import java.time.format.DateTimeFormatter
 
 @Composable
-internal fun StudyRecordsDialog(state: LoadState<StatisticsSummary>, onDismiss: () -> Unit, onRetry: () -> Unit, onReport: (Long) -> Unit) {
+internal fun StudyRecordsDialog(state: LoadState<StatisticsSummary>, onDismiss: () -> Unit, onRetry: () -> Unit,
+    onAdd: () -> Unit, onEdit: (Long) -> Unit, onReport: (Long) -> Unit) {
     DetailWindow("专注记录", "关闭记录", onDismiss) {
+        Button(onClick = onAdd) { Text("手动添加记录") }
         when (state) {
             LoadState.Loading -> CircularProgressIndicator()
             is LoadState.Error -> { Text(state.message); TextButton(onClick = onRetry) { Text("重试") } }
@@ -31,11 +33,15 @@ internal fun StudyRecordsDialog(state: LoadState<StatisticsSummary>, onDismiss: 
                 LazyColumn(Modifier.weight(1f).testTag("statistics-records"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     if (summary.sessions.isEmpty()) item { Text("暂无专注记录") }
                     items(summary.sessions, key = { it.id }, contentType = { "session" }) { session ->
-                        TraceCard(Modifier.testTag("study-session-${session.id}").clickable { onReport(session.id) }) {
+                        TraceCard(Modifier.testTag("study-session-${session.id}").clickable {
+                            if (session.source == "MANUAL") onEdit(session.id) else onReport(session.id)
+                        }) {
+                            if (session.source == "MANUAL") Text("手动添加", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                             Text(session.taskTitleSnapshot ?: "自由专注 / 原待办不可用", style = MaterialTheme.typography.titleMedium)
                             Text(compactDuration(session.focusSeconds), color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.titleLarge)
                             Text("开始：${formatter.format(Instant.ofEpochMilli(session.startTime))}", style = MaterialTheme.typography.bodySmall)
                             Text("结束：${formatter.format(Instant.ofEpochMilli(session.endTime!!))}", style = MaterialTheme.typography.bodySmall)
+                            session.note?.let { Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) }
                         }
                     }
                 }

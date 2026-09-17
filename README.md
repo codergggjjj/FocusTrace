@@ -2,7 +2,7 @@
 
 记录每一次专注，也看见每一次分心。
 
-[下载 FocusTrace v1.0.2 APK](https://github.com/codergggjjj/FocusTrace/releases/download/v1.0.2/FocusTrace-v1.0.2-performance.apk) · [发布范围与说明](docs/release-v1.0.2.md)
+[下载 FocusTrace v1.0.3 APK](https://github.com/codergggjjj/FocusTrace/releases/download/v1.0.3/FocusTrace-v1.0.3-performance.apk) · [发布范围与说明](docs/release-v1.0.3.md)
 
 此版本使用 debug 签名，面向 Android 8.0 及以上，按当前已实现功能发布。
 

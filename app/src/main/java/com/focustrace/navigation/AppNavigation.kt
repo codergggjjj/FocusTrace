@@ -74,7 +74,7 @@ fun AppNavigation(container: AppContainer) {
                     }
                 }
                 composable(Tab.STATISTICS.route) {
-                    StatisticsScreen(viewModel(factory = viewModelFactory { initializer { StatisticsViewModel(container.statisticsRepository, createSavedStateHandle()) } })) { id ->
+                    StatisticsScreen(viewModel(factory = viewModelFactory { initializer { StatisticsViewModel(container.statisticsRepository, container.focusRepository, container.taskRepository, createSavedStateHandle()) } })) { id ->
                         controller.navigate("report/$id") { launchSingleTop = true }
                     }
                 }
