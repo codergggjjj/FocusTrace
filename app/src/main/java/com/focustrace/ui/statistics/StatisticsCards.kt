@@ -29,12 +29,12 @@ internal fun compactDuration(seconds: Long): String = when {
     else -> "0 分钟"
 }
 @Composable
-internal fun StudyOverview(totals: StatisticsTotals, onRecords: () -> Unit, onDetails: () -> Unit) {
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer), modifier = Modifier.fillMaxWidth()) {
+internal fun StudyOverview(totals: StatisticsTotals, period: StatisticsPeriod, onRecords: () -> Unit, onDetails: () -> Unit) {
+    Card(shape = MaterialTheme.shapes.medium, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("累计学习时间", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSecondaryContainer)
-            Text(compactDuration(totals.focusSeconds), style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.testTag("study-total")
+            Text("${period.label}专注", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onPrimaryContainer)
+            Text(compactDuration(totals.focusSeconds), style = MaterialTheme.typography.displaySmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.testTag("study-total")
                     .semantics { contentDescription = "累计学习时间：${formatDuration(totals.focusSeconds)}" })
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OverviewNumber("${totals.sessions}", "专注次数", Modifier.weight(1f))
@@ -42,24 +42,26 @@ internal fun StudyOverview(totals: StatisticsTotals, onRecords: () -> Unit, onDe
                 OverviewNumber(totals.focusPercent?.let { "$it%" } ?: "—", "专注率", Modifier.weight(1f))
             }
             FilledTonalButton(onClick = onRecords, modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.secondary)) {
+                colors = ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.onSurface)) {
                 Text("查看专注记录")
             }
         }
     }
-    TextButton(onClick = onDetails, modifier = Modifier.fillMaxWidth()) {
+    TextButton(onClick = onDetails, modifier = Modifier.fillMaxWidth(),
+        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)) {
         Text("分心 ${totals.distractions} 次 · ${compactDuration(totals.distractionSeconds)}   查看详情")
     }
 }
 @Composable
 private fun OverviewNumber(value: String, label: String, modifier: Modifier) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(value, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSecondaryContainer)
-        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSecondaryContainer)
+        Text(value, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onPrimaryContainer)
+        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
     }
 }
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 internal fun StudyTrend(summary: StatisticsSummary, period: StatisticsPeriod) {
     var metric by rememberSaveable { mutableIntStateOf(0) }
     val hourly = period == StatisticsPeriod.DAY
@@ -76,8 +78,13 @@ internal fun StudyTrend(summary: StatisticsSummary, period: StatisticsPeriod) {
             Text(if (hourly) "开始时段分布" else "每日趋势", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
             Text(if (metric == 1) "次" else "分钟", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            captions.forEachIndexed { i, label -> FilterChip(selected = metric == i, onClick = { metric = i }, label = { Text(label) }) }
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+            captions.forEachIndexed { i, label ->
+                SegmentedButton(selected = metric == i, onClick = { metric = i },
+                    colors = SegmentedButtonDefaults.colors(activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer),
+                    shape = SegmentedButtonDefaults.itemShape(i, captions.size), icon = {}) { Text(label, style = MaterialTheme.typography.labelLarge) }
+            }
         }
         if (values.all { it == 0L }) {
             Box(Modifier.fillMaxWidth().height(144.dp), contentAlignment = Alignment.Center) {
@@ -86,7 +93,12 @@ internal fun StudyTrend(summary: StatisticsSummary, period: StatisticsPeriod) {
         } else {
             // 48dp touch targets and lazy bars preserve smooth scrolling for month/hour views.
             val barState = rememberLazyListState()
-            LaunchedEffect(summary.range.start, hourly, metric) { barState.scrollToItem((activeIndex - 2).coerceAtLeast(0)) }
+            LaunchedEffect(summary.range.start, hourly, metric) {
+                // The chart is subcomposed during its parent's lazy-list measurement.
+                // Wait for that pass to finish before requesting another measurement.
+                withFrameNanos { }
+                barState.scrollToItem((activeIndex - 2).coerceAtLeast(0))
+            }
             LazyRow(state = barState, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth().testTag("trend-bars")) {
                 itemsIndexed(values, key = { i, _ -> i }, contentType = { _, _ -> "bar" }) { index, amount ->
                     val label = if (hourly) "$index 时" else "${summary.days[index].date.dayOfMonth} 日"
@@ -97,14 +109,14 @@ internal fun StudyTrend(summary: StatisticsSummary, period: StatisticsPeriod) {
                         Box(Modifier.height(104.dp).fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
                             Box(Modifier.width(24.dp).height((104f * amount.toFloat() / maximum).coerceAtLeast(if (amount > 0) 3f else 0f).dp)
                                 .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
-                                .background(if (activeIndex == index) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.secondary.copy(alpha = .35f)))
+                                .background(if (activeIndex == index) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = .35f)))
                         }
                         Text(label, style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }
             Text("${if (hourly) "${activeIndex}:00 开始" else summary.days[activeIndex].date.toString()} · ${if (metric == 1) "${values[activeIndex]} 次" else formatDuration(values[activeIndex])}",
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

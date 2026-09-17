@@ -12,13 +12,13 @@ import androidx.compose.ui.unit.sp
 import com.focustrace.data.datastore.ThemeMode
 
 private val LightColors = lightColorScheme(
-    primary = Color(0xFFC93469), onPrimary = Color.White,
-    primaryContainer = Color(0xFFFFE4ED), onPrimaryContainer = Color(0xFF8D1946),
+    primary = Color(0xFFD6336C), onPrimary = Color.White,
+    primaryContainer = Color(0xFFFFE9F0), onPrimaryContainer = Color(0xFF641F39),
     secondary = Color(0xFF087DA4), onSecondary = Color.White,
     secondaryContainer = Color(0xFFDDF3FC), onSecondaryContainer = Color(0xFF075571),
     tertiary = Color(0xFF7854AA), onTertiary = Color.White,
     tertiaryContainer = Color(0xFFEFE6FB), onTertiaryContainer = Color(0xFF523476),
-    background = Color(0xFFF6F7FB), onBackground = Color(0xFF242632),
+    background = Color(0xFFF7F7F9), onBackground = Color(0xFF242632),
     surface = Color(0xFFFFFFFF), onSurface = Color(0xFF242632),
     surfaceVariant = Color(0xFFEEF0F6), onSurfaceVariant = Color(0xFF656B7B),
     surfaceTint = Color(0xFFFFFFFF),
@@ -39,19 +39,21 @@ private val DarkColors = darkColorScheme(
     outline = Color(0xFF8D96A9), outlineVariant = Color(0xFF3B4354)
 )
 private val FocusTypography = Typography(
-    headlineLarge = TextStyle(fontWeight = FontWeight.Bold, fontSize = 30.sp, lineHeight = 38.sp),
-    headlineMedium = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 26.sp, lineHeight = 34.sp),
-    titleLarge = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 28.sp),
-    titleMedium = TextStyle(fontWeight = FontWeight.Medium, fontSize = 16.sp, lineHeight = 24.sp),
+    displaySmall = TextStyle(fontWeight = FontWeight.Bold, fontSize = 32.sp, lineHeight = 40.sp),
+    headlineLarge = TextStyle(fontWeight = FontWeight.Bold, fontSize = 28.sp, lineHeight = 36.sp),
+    headlineMedium = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 24.sp, lineHeight = 32.sp),
+    headlineSmall = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 22.sp, lineHeight = 30.sp),
+    titleLarge = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 18.sp, lineHeight = 26.sp),
+    titleMedium = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 16.sp, lineHeight = 24.sp),
     bodyLarge = TextStyle(fontSize = 16.sp, lineHeight = 26.sp),
-    bodyMedium = TextStyle(fontSize = 14.sp, lineHeight = 22.sp),
-    bodySmall = TextStyle(fontSize = 12.sp, lineHeight = 18.sp),
+    bodyMedium = TextStyle(fontSize = 15.sp, lineHeight = 23.sp),
+    bodySmall = TextStyle(fontSize = 13.sp, lineHeight = 20.sp),
     labelLarge = TextStyle(fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 20.sp)
 )
 @Composable
 fun FocusTraceTheme(mode: ThemeMode = ThemeMode.SYSTEM, content: @Composable () -> Unit) {
     val dark = when (mode) { ThemeMode.SYSTEM -> isSystemInDarkTheme(); ThemeMode.LIGHT -> false; ThemeMode.DARK -> true }
     MaterialTheme(colorScheme = if (dark) DarkColors else LightColors, typography = FocusTypography,
-        shapes = Shapes(small = RoundedCornerShape(12.dp), medium = RoundedCornerShape(18.dp), large = RoundedCornerShape(24.dp)),
+        shapes = Shapes(small = RoundedCornerShape(12.dp), medium = RoundedCornerShape(18.dp), large = RoundedCornerShape(20.dp), extraLarge = RoundedCornerShape(24.dp)),
         content = content)
 }

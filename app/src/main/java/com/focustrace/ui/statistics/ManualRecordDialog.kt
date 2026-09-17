@@ -66,7 +66,7 @@ internal fun ManualRecordDialog(record: FocusSessionEntity?, tasks: LoadState<Li
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("删除记录") }
             }
         },
-        confirmButton = { TextButton(enabled = !busy && parsed.isSuccess,
+        confirmButton = { Button(enabled = !busy && parsed.isSuccess,
             onClick = { onSave(date, start, end, taskId, note) }) { Text(if (busy) "保存中…" else "保存记录") } },
         dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text("取消") } })
     if (choosingTask) AlertDialog(onDismissRequest = { choosingTask = false }, title = { Text("选择任务") },

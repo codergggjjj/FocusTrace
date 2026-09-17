@@ -43,7 +43,7 @@ fun SettingsEditor(original: UserSettings, busy: Boolean, error: String?, onDism
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
         },
-        confirmButton = { TextButton(enabled = valid && !busy, onClick = {
+        confirmButton = { Button(enabled = valid && !busy, onClick = {
             onSave(original.copy(pomodoroMinutes = focus.toInt(), breakMinutes = rest.toInt(),
                 distractionThreshold = threshold.toInt(), autoStartBreak = autoBreak, autoStartFocus = autoFocus, darkMode = ThemeMode.valueOf(theme)))
         }) { Text(if (busy) "保存中…" else "保存设置") } },

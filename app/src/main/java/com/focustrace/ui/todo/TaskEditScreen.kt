@@ -39,7 +39,7 @@ fun TaskEditScreen(task: TaskEntity?, busy: Boolean, defaultMinutes: Int,
                     isError = duration == null || duration !in 1..1440,
                     supportingText = { Text("请输入 1–1440 分钟") })
                 if (task != null) {
-                    OutlinedButton(onClick = onAddRecord, enabled = !busy) { Text("添加专注记录") }
+                    FilledTonalButton(onClick = onAddRecord, enabled = !busy) { Text("添加专注记录") }
                     TextButton(onClick = onDelete, enabled = !busy,
                         modifier = Modifier.testTag("delete-task-${task.id}"),
                         colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
@@ -48,7 +48,7 @@ fun TaskEditScreen(task: TaskEntity?, busy: Boolean, defaultMinutes: Int,
                 }
             }
         },
-        confirmButton = { TextButton(enabled = !busy && title.isNotBlank() && (timerType == 1 || (duration != null && duration in 1..1440)),
+        confirmButton = { Button(enabled = !busy && title.isNotBlank() && (timerType == 1 || (duration != null && duration in 1..1440)),
             onClick = { onSave(title, duration?.takeIf { it in 1..1440 } ?: 25, timerType) }) { Text(if (busy) "保存中…" else "保存") } },
         dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text("取消") } })
 }

@@ -12,6 +12,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.focustrace.statistics.*
@@ -19,6 +20,7 @@ import com.focustrace.ui.components.*
 import java.time.*
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 fun StatisticsScreen(viewModel: StatisticsViewModel, onReport: (Long) -> Unit) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val selection by viewModel.selection.collectAsStateWithLifecycle()
@@ -52,7 +54,7 @@ fun StatisticsScreen(viewModel: StatisticsViewModel, onReport: (Long) -> Unit) {
         text = { Text("学习时间为有效专注时长，不含暂停和分心。记录按开始日归属；日视图的时段按开始小时归属，不代表实际逐小时分配。周一为每周起点。\n\n专注率 = 有效专注 ÷（有效专注 + 分心时间）。首次分心均值仅统计发生过分心的记录。") },
         confirmButton = { TextButton(onClick = { showRules = false }) { Text("知道了") } })
     LazyColumn(Modifier.fillMaxSize().testTag("statistics-list"), contentPadding = PaddingValues(20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        verticalArrangement = Arrangement.spacedBy(24.dp)) {
         item(key = "header", contentType = "header") {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
@@ -63,10 +65,13 @@ fun StatisticsScreen(viewModel: StatisticsViewModel, onReport: (Long) -> Unit) {
             }
         }
         item(key = "period", contentType = "period") {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatisticsPeriod.entries.forEach { period ->
-                    FilterChip(modifier = Modifier.weight(1f), selected = selection.period == period,
-                        onClick = { viewModel.choose(period) }, label = { Text(period.label) })
+            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                StatisticsPeriod.entries.forEachIndexed { index, period ->
+                    SegmentedButton(selected = selection.period == period,
+                        colors = SegmentedButtonDefaults.colors(activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer),
+                        shape = SegmentedButtonDefaults.itemShape(index, StatisticsPeriod.entries.size), icon = {},
+                        onClick = { viewModel.choose(period) }) { Text(period.label) }
                 }
             }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -76,7 +81,8 @@ fun StatisticsScreen(viewModel: StatisticsViewModel, onReport: (Long) -> Unit) {
                         else if (selection.period == StatisticsPeriod.MONTH) "${selection.range.start.year} 年 ${selection.range.start.monthValue} 月"
                         else "${selection.range.start} 至 ${selection.range.endExclusive.minusDays(1)}",
                         style = MaterialTheme.typography.titleSmall, modifier = Modifier.testTag("statistics-range"))
-                    TextButton(onClick = { showDate = true }, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                    TextButton(onClick = { showDate = true }, contentPadding = PaddingValues(horizontal = 8.dp),
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)) {
                         Text(if (selection.period == StatisticsPeriod.MONTH) "选择月份" else "选择日期")
                     }
                 }
@@ -88,7 +94,7 @@ fun StatisticsScreen(viewModel: StatisticsViewModel, onReport: (Long) -> Unit) {
             is LoadState.Error -> item(key = "error") { Text(value.message); TextButton(onClick = viewModel::retry) { Text("重试") } }
             is LoadState.Ready -> {
                 item(key = "overview", contentType = "overview") {
-                    StudyOverview(value.value.totals, onRecords = { showRecords = true }, onDetails = { showDetails = true })
+                    StudyOverview(value.value.totals, selection.period, onRecords = { showRecords = true }, onDetails = { showDetails = true })
                 }
                 item(key = "chart", contentType = "chart") { StudyTrend(value.value, selection.period) }
                 item(key = "heatmap", contentType = "heatmap") {
@@ -107,8 +113,37 @@ fun StatisticsScreen(viewModel: StatisticsViewModel, onReport: (Long) -> Unit) {
 }
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 private fun PeriodDateDialog(selection: StatisticsSelection, onDismiss: () -> Unit, onConfirm: (LocalDate) -> Unit) {
     val month = selection.period == StatisticsPeriod.MONTH
+    var manual by rememberSaveable { mutableStateOf(false) }
+    val configuration = LocalConfiguration.current
+    // The calendar has a minimum width; use the existing text form on compact displays.
+    val compact = configuration.screenWidthDp < 360 || configuration.screenHeightDp < 600 || configuration.fontScale > 1.2f
+    if (!month && !manual && !compact) {
+        val today = LocalDate.now()
+        val picker = rememberDatePickerState(
+            initialSelectedDateMillis = selection.range.start.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
+            selectableDates = remember(today) { object : SelectableDates {
+                override fun isSelectableDate(utcTimeMillis: Long) =
+                    Instant.ofEpochMilli(utcTimeMillis).atZone(ZoneOffset.UTC).toLocalDate() <= today
+                override fun isSelectableYear(year: Int) = year <= today.year
+            } })
+        DatePickerDialog(onDismissRequest = onDismiss,
+            confirmButton = { Button(enabled = picker.selectedDateMillis != null, onClick = {
+                picker.selectedDateMillis?.let { onConfirm(Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate()) }
+            }) { Text("查看") } },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = { manual = true }) { Text("输入日期") }
+                    TextButton(onClick = onDismiss) { Text("取消") }
+                }
+            }) {
+            DatePicker(state = picker, modifier = Modifier.weight(1f, fill = false),
+                title = { Text("选择日期", Modifier.padding(start = 24.dp, top = 16.dp)) })
+        }
+        return
+    }
     var input by rememberSaveable { mutableStateOf(if (month) YearMonth.from(selection.range.start).toString() else selection.range.start.toString()) }
     val date = runCatching { if (month) YearMonth.parse(input.trim()).atDay(1) else LocalDate.parse(input.trim()) }.getOrNull()
     val valid = date != null && date <= LocalDate.now()

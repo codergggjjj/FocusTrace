@@ -22,7 +22,7 @@ import java.time.format.DateTimeFormatter
 internal fun StudyRecordsDialog(state: LoadState<StatisticsSummary>, onDismiss: () -> Unit, onRetry: () -> Unit,
     onAdd: () -> Unit, onEdit: (Long) -> Unit, onReport: (Long) -> Unit) {
     DetailWindow("专注记录", "关闭记录", onDismiss) {
-        Button(onClick = onAdd) { Text("手动添加记录") }
+        FilledTonalButton(onClick = onAdd) { Text("手动添加记录") }
         when (state) {
             LoadState.Loading -> CircularProgressIndicator()
             is LoadState.Error -> { Text(state.message); TextButton(onClick = onRetry) { Text("重试") } }
@@ -38,7 +38,7 @@ internal fun StudyRecordsDialog(state: LoadState<StatisticsSummary>, onDismiss: 
                         }) {
                             if (session.source == "MANUAL") Text("手动添加", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                             Text(session.taskTitleSnapshot ?: "自由专注 / 原待办不可用", style = MaterialTheme.typography.titleMedium)
-                            Text(compactDuration(session.focusSeconds), color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.titleLarge)
+                            Text(compactDuration(session.focusSeconds), color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
                             Text("开始：${formatter.format(Instant.ofEpochMilli(session.startTime))}", style = MaterialTheme.typography.bodySmall)
                             Text("结束：${formatter.format(Instant.ofEpochMilli(session.endTime!!))}", style = MaterialTheme.typography.bodySmall)
                             session.note?.let { Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) }

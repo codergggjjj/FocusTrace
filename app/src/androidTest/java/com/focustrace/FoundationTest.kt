@@ -172,6 +172,7 @@ class FoundationTest {
             compose.onNodeWithTag("statistics-list").performScrollToNode(hasText("今日"))
             compose.onNodeWithText("今日").performClick()
             compose.onNodeWithText("选择日期").performClick()
+            compose.onNodeWithText("输入日期").performClick()
             compose.onNodeWithText("日期（yyyy-MM-dd）").performTextReplacement("2024-06-12")
             compose.onNodeWithText("查看").performClick()
             compose.onNodeWithTag("statistics-list").performScrollToNode(hasTestTag("study-total"))
@@ -220,7 +221,7 @@ class FoundationTest {
             assertEquals(!original.autoStartFocus, saved.autoStartFocus)
             assertEquals(com.focustrace.data.datastore.ThemeMode.DARK, saved.darkMode)
             compose.onAllNodesWithText("待办").onFirst().performClick()
-            compose.onNodeWithText("创建待办").performClick()
+            compose.onNodeWithContentDescription("创建待办").performClick()
             compose.onNodeWithText("目标分钟数").assertTextContains("42")
             compose.onNodeWithText("取消").performClick()
         } finally { runBlocking { app.container.settingsRepository.update(original) } }
@@ -246,7 +247,7 @@ class FoundationTest {
     }
 
     @Test fun stopwatchTaskPersistsAndSelectsStopwatchWhenStarting() {
-        compose.onNodeWithText("创建待办").performClick()
+        compose.onNodeWithContentDescription("创建待办").performClick()
         compose.onNodeWithText("待办名称").performTextInput("正向待办验证")
         compose.onNodeWithTag("timer-type-stopwatch").performScrollTo().performClick()
         compose.onNodeWithText("目标分钟数").assertDoesNotExist()
@@ -320,7 +321,7 @@ class FoundationTest {
     }
 
     @Test fun taskCrudPersistsAndValidatesInput() {
-        compose.onNodeWithText("创建待办").performClick()
+        compose.onNodeWithContentDescription("创建待办").performClick()
         compose.onNodeWithText("保存").assertIsNotEnabled()
         compose.onNodeWithText("待办名称").performTextInput("验证任务")
         compose.onNodeWithText("目标分钟数").performTextReplacement("0")
