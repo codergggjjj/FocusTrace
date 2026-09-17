@@ -298,6 +298,7 @@ class FoundationTest {
         assertEquals(if (timerType == 0) 720L else 0L, session.plannedSeconds)
         compose.onNodeWithText("暂停").performScrollTo().performClick()
         compose.waitUntil(5000) { compose.onAllNodesWithText("已暂停").fetchSemanticsNodes().isNotEmpty() }
+        compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
         compose.onNodeWithText("返回待办").performScrollTo().performClick()
         val other = TaskEntity(title = "另一个任务", targetMinutes = 5, createdAt = 2, updatedAt = 2)
         val otherId = runBlocking { db.taskDao().insert(other) }
@@ -371,7 +372,7 @@ class FoundationTest {
         compose.onNodeWithText("暂停").performScrollTo().performClick()
         compose.waitUntil(5_000) { compose.onAllNodesWithText("已暂停").fetchSemanticsNodes().isNotEmpty() }
         compose.activityRule.scenario.recreate()
-        compose.onNodeWithText("继续").performScrollTo().performClick()
+        compose.onNodeWithTag("resume-from-pause").performClick()
         compose.waitUntil(5_000) { compose.onAllNodesWithText("正在专注").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("结束专注").performClick()
         compose.onNodeWithText("确认结束").performClick()
@@ -382,9 +383,9 @@ class FoundationTest {
         enterRunningFocus(1)
         compose.waitUntil(5_000) { compose.onAllNodesWithText("暂停").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("暂停").performScrollTo().performClick()
-        compose.waitUntil(5_000) { compose.onAllNodesWithText("继续").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("继续专注").fetchSemanticsNodes().isNotEmpty() }
         compose.activityRule.scenario.recreate()
-        compose.onNodeWithText("继续").performScrollTo().performClick()
+        compose.onNodeWithTag("resume-from-pause").performClick()
         compose.onNodeWithText("结束专注").performClick()
         compose.onNodeWithText("确认结束").performClick()
         compose.waitUntil(5_000) { compose.onAllNodesWithText("本轮已结束").fetchSemanticsNodes().isNotEmpty() }

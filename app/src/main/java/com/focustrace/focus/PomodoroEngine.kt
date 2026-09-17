@@ -113,11 +113,14 @@ class PomodoroEngine(private val db: FocusTraceDatabase, private val clock: Time
             distractionSeconds = s.distractionSeconds + if (qualifies) duration / 1000 else 0), at))
     }
     suspend fun pause(): Unit = lock.withLock { db.withTransaction {
-        settleDeparture(clock.snapshot())
-        val s = advance() ?: return@withTransaction
+        val at = clock.snapshot()
+        settleDeparture(at)
+        val s = advance(at) ?: return@withTransaction
         if (s.status == 1) {
             val progress = focusElapsed(s)
-            dao.update(s.copy(status = 2, elapsedMillis = progress, focusSeconds = progress / 1000))
+            // In paused state the anchor records when the pause began. Resume
+            // replaces it with a running anchor, preserving elapsed-time behavior.
+            dao.update(anchored(s.copy(status = 2, elapsedMillis = progress, focusSeconds = progress / 1000), at))
         }
     } }
     suspend fun resume(): Unit = lock.withLock {

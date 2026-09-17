@@ -16,7 +16,7 @@ interface FocusSessionDao {
     suspend fun updateManual(id: Long, start: Long, end: Long, seconds: Long, millis: Long, taskId: Long?, title: String?, note: String?): Int
     @Query("DELETE FROM focus_sessions WHERE id = :id AND source = 'MANUAL' AND status = 4")
     suspend fun deleteManual(id: Long): Int
-    @Query("SELECT COALESCE(SUM(focusSeconds), 0) FROM focus_sessions WHERE taskId = :taskId AND endTime IS NOT NULL AND status IN (3, 4)")
+    @Query("SELECT COALESCE(SUM(focusSeconds), 0) FROM focus_sessions WHERE taskId = :taskId AND endTime IS NOT NULL AND status IN (3, 4) AND focusSeconds > 300")
     fun observeTaskFocusSeconds(taskId: Long): Flow<Long>
     @Transaction
     @Query("SELECT * FROM focus_sessions WHERE id = :id")

@@ -6,6 +6,10 @@ import java.time.temporal.TemporalAdjusters
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 
+const val MIN_VALID_FOCUS_SECONDS = 5 * 60L
+fun isValidFocusSession(session: com.focustrace.data.local.entity.FocusSessionEntity) =
+    session.focusSeconds > MIN_VALID_FOCUS_SECONDS
+
 enum class StatisticsPeriod(val label: String, val unit: String) { DAY("今日", "日"), WEEK("本周", "周"), MONTH("本月", "月") }
 data class StatisticsRange(val start: LocalDate, val endExclusive: LocalDate, val zone: ZoneId) {
     val startMillis get() = start.atStartOfDay(zone).toInstant().toEpochMilli()
@@ -32,6 +36,7 @@ fun summarizeStatistics(records: List<StatisticsRecord>, range: StatisticsRange)
     val startMillis = range.startMillis
     val endMillis = range.endMillis
     val eligible = records.filter { it.session.endTime != null && it.session.status in listOf(3, 4) && it.session.startTime >= startMillis && it.session.startTime < endMillis }
+    val valid = eligible.filter { isValidFocusSession(it.session) }
     fun totals(rows: List<StatisticsRecord>): StatisticsTotals {
         val focus = rows.sumOf { it.session.focusSeconds.coerceAtLeast(0) }
         val events = rows.flatMap { it.events }
@@ -46,12 +51,12 @@ fun summarizeStatistics(records: List<StatisticsRecord>, range: StatisticsRange)
             if (events.isEmpty()) null else (distraction.toDouble() / events.size).roundToLong(),
             if (firstTimes.isEmpty()) null else firstTimes.average().roundToLong())
     }
-    val byDay = eligible.groupBy { Instant.ofEpochMilli(it.session.startTime).atZone(range.zone).toLocalDate() }
+    val byDay = valid.groupBy { Instant.ofEpochMilli(it.session.startTime).atZone(range.zone).toLocalDate() }
     val days = generateSequence(range.start) { it.plusDays(1) }.takeWhile { it < range.endExclusive }
         .map { DailyStatistics(it, totals(byDay[it].orEmpty())) }.toList()
     val hours = if (range.endExclusive == range.start.plusDays(1)) {
-        val byHour = eligible.groupBy { Instant.ofEpochMilli(it.session.startTime).atZone(range.zone).hour }
+        val byHour = valid.groupBy { Instant.ofEpochMilli(it.session.startTime).atZone(range.zone).hour }
         (0..23).map { totals(byHour[it].orEmpty()) }
     } else emptyList()
-    return StatisticsSummary(range, totals(eligible), days, eligible.map { it.session }.sortedWith(compareByDescending<com.focustrace.data.local.entity.FocusSessionEntity> { it.startTime }.thenByDescending { it.id }), hours)
+    return StatisticsSummary(range, totals(valid), days, eligible.map { it.session }.sortedWith(compareByDescending<com.focustrace.data.local.entity.FocusSessionEntity> { it.startTime }.thenByDescending { it.id }), hours)
 }

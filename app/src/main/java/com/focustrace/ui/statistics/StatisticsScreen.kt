@@ -51,7 +51,7 @@ fun StatisticsScreen(viewModel: StatisticsViewModel, onReport: (Long) -> Unit) {
         }, onDelete = { editingId?.let { viewModel.deleteManual(it) { editorOpen = false; editingId = null } } })
     if (showDetails && summary != null) FocusDetailsDialog(summary.totals) { showDetails = false }
     if (showRules) AlertDialog(onDismissRequest = { showRules = false }, title = { Text("统计说明") },
-        text = { Text("学习时间为有效专注时长，不含暂停和分心。记录按开始日归属；日视图的时段按开始小时归属，不代表实际逐小时分配。周一为每周起点。\n\n专注率 = 有效专注 ÷（有效专注 + 分心时间）。首次分心均值仅统计发生过分心的记录。") },
+        text = { Text("单次有效专注必须大于 5 分钟才计入统计；较短记录仍保留在专注历史中。学习时间不含暂停和分心。记录按开始日归属；日视图的时段按开始小时归属，不代表实际逐小时分配。周一为每周起点。\n\n专注率 = 有效专注 ÷（有效专注 + 分心时间）。首次分心均值仅统计发生过分心的有效记录。") },
         confirmButton = { TextButton(onClick = { showRules = false }) { Text("知道了") } })
     LazyColumn(Modifier.fillMaxSize().testTag("statistics-list"), contentPadding = PaddingValues(20.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp)) {
