@@ -51,11 +51,19 @@ class StatisticsViewModel(repository: StatisticsRepository,
     }
     val selection = combine(period, anchor, calendar) { p, a, c -> selection(p, a, c.first, c.second) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), selection(period.value, anchor.value, LocalDate.now(), ZoneId.systemDefault()))
-    val uiState = combine(selection, reload) { selected, _ -> selected.range }.flatMapLatest { range ->
-        repository.statistics(range).asLoadState().onStart { emit(LoadState.Loading) }
+    val uiState = combine(selection, reload) { selected, _ -> selected }.flatMapLatest { selected ->
+        repository.dashboard(selected.range, selected.period).asLoadState().onStart { emit(LoadState.Loading) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), LoadState.Loading)
+    val habits = combine(calendar, reload) { current, _ -> current }.flatMapLatest { (today, zone) ->
+        repository.habits(today, zone).asLoadState().onStart { emit(LoadState.Loading) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), LoadState.Loading)
     val heatmap = combine(selection, reload) { selected, attempt ->
-        statisticsRange(selected.range.start, StatisticsPeriod.MONTH, selected.range.zone) to attempt
+        val today = LocalDate.now(selected.range.zone)
+        val monthAnchor = if (selected.period == StatisticsPeriod.YEAR) {
+            if (selected.range.start.year == today.year) today.withDayOfMonth(1)
+            else selected.range.endExclusive.minusMonths(1).withDayOfMonth(1)
+        } else selected.range.start
+        statisticsRange(monthAnchor, StatisticsPeriod.MONTH, selected.range.zone) to attempt
     }.distinctUntilChanged().flatMapLatest { (range, _) ->
         repository.statistics(range).asLoadState().onStart { emit(LoadState.Loading) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), LoadState.Loading)
@@ -75,6 +83,7 @@ class StatisticsViewModel(repository: StatisticsRepository,
             StatisticsPeriod.DAY -> selected.range.start.plusDays(direction.toLong())
             StatisticsPeriod.WEEK -> selected.range.start.plusWeeks(direction.toLong())
             StatisticsPeriod.MONTH -> selected.range.start.plusMonths(direction.toLong())
+            StatisticsPeriod.YEAR -> selected.range.start.plusYears(direction.toLong())
         }
         savedState["statisticsAnchor"] = next.toEpochDay()
     }

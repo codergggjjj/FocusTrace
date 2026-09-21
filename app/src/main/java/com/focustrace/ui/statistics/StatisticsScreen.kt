@@ -25,6 +25,7 @@ fun StatisticsScreen(viewModel: StatisticsViewModel, onReport: (Long) -> Unit) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val selection by viewModel.selection.collectAsStateWithLifecycle()
     val heatmap by viewModel.heatmap.collectAsStateWithLifecycle()
+    val habits by viewModel.habits.collectAsStateWithLifecycle()
     var showDate by rememberSaveable { mutableStateOf(false) }
     var showRecords by rememberSaveable { mutableStateOf(false) }
     var showDetails by rememberSaveable { mutableStateOf(false) }
@@ -37,12 +38,17 @@ fun StatisticsScreen(viewModel: StatisticsViewModel, onReport: (Long) -> Unit) {
     if (showDate) PeriodDateDialog(selection, onDismiss = { showDate = false }) {
         viewModel.selectDate(it); showDate = false
     }
-    if (showRecords) StudyRecordsDialog(state, onDismiss = { showRecords = false }, onRetry = viewModel::retry,
+    val summaryState: LoadState<StatisticsSummary> = when (val value = state) {
+        LoadState.Loading -> LoadState.Loading
+        is LoadState.Error -> value
+        is LoadState.Ready -> LoadState.Ready(value.value.current)
+    }
+    if (showRecords) StudyRecordsDialog(summaryState, onDismiss = { showRecords = false }, onRetry = viewModel::retry,
         onAdd = { editingId = null; viewModel.clearEditError(); editorOpen = true },
         onEdit = { editingId = it; viewModel.clearEditError(); editorOpen = true }) {
         showRecords = false; onReport(it)
     }
-    val summary = (state as? LoadState.Ready)?.value
+    val summary = (state as? LoadState.Ready)?.value?.current
     val editedRecord = summary?.sessions?.firstOrNull { it.id == editingId }
     if (editorOpen && (editingId == null || editedRecord != null)) ManualRecordDialog(
         editedRecord, tasks, busy, editError, onDismiss = { editorOpen = false },
@@ -51,7 +57,7 @@ fun StatisticsScreen(viewModel: StatisticsViewModel, onReport: (Long) -> Unit) {
         }, onDelete = { editingId?.let { viewModel.deleteManual(it) { editorOpen = false; editingId = null } } })
     if (showDetails && summary != null) FocusDetailsDialog(summary.totals) { showDetails = false }
     if (showRules) AlertDialog(onDismissRequest = { showRules = false }, title = { Text("统计说明") },
-        text = { Text("单次有效专注必须大于 5 分钟才计入统计；较短记录仍保留在专注历史中。学习时间不含暂停和分心。记录按开始日归属；日视图的时段按开始小时归属，不代表实际逐小时分配。周一为每周起点。\n\n专注率 = 有效专注 ÷（有效专注 + 分心时间）。首次分心均值仅统计发生过分心的有效记录。") },
+        text = { Text("超过 5 分钟的已结束记录才计入统计，较短记录仍保留在历史中。") },
         confirmButton = { TextButton(onClick = { showRules = false }) { Text("知道了") } })
     LazyColumn(Modifier.fillMaxSize().testTag("statistics-list"), contentPadding = PaddingValues(20.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp)) {
@@ -59,7 +65,7 @@ fun StatisticsScreen(viewModel: StatisticsViewModel, onReport: (Long) -> Unit) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("统计", style = MaterialTheme.typography.headlineLarge)
-                    Text("看见专注，也理解分心", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("看见投入，也看见变化", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 IconButton(onClick = { showRules = true }) { Icon(Icons.Outlined.Info, contentDescription = "统计说明") }
             }
@@ -77,13 +83,20 @@ fun StatisticsScreen(viewModel: StatisticsViewModel, onReport: (Long) -> Unit) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = { viewModel.shift(-1) }) { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, "上一${selection.period.unit}") }
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(if (selection.period == StatisticsPeriod.DAY) selection.range.start.toString()
-                        else if (selection.period == StatisticsPeriod.MONTH) "${selection.range.start.year} 年 ${selection.range.start.monthValue} 月"
-                        else "${selection.range.start} 至 ${selection.range.endExclusive.minusDays(1)}",
+                    Text(when (selection.period) {
+                        StatisticsPeriod.DAY -> selection.range.start.toString()
+                        StatisticsPeriod.MONTH -> "${selection.range.start.year} 年 ${selection.range.start.monthValue} 月"
+                        StatisticsPeriod.YEAR -> "${selection.range.start.year} 年"
+                        StatisticsPeriod.WEEK -> "${selection.range.start} 至 ${selection.range.endExclusive.minusDays(1)}"
+                    },
                         style = MaterialTheme.typography.titleSmall, modifier = Modifier.testTag("statistics-range"))
                     TextButton(onClick = { showDate = true }, contentPadding = PaddingValues(horizontal = 8.dp),
                         colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)) {
-                        Text(if (selection.period == StatisticsPeriod.MONTH) "选择月份" else "选择日期")
+                        Text(when (selection.period) {
+                            StatisticsPeriod.MONTH -> "选择月份"
+                            StatisticsPeriod.YEAR -> "选择年份"
+                            else -> "选择日期"
+                        })
                     }
                 }
                 IconButton(onClick = { viewModel.shift(1) }, enabled = selection.canNext) { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, "下一${selection.period.unit}") }
@@ -94,9 +107,12 @@ fun StatisticsScreen(viewModel: StatisticsViewModel, onReport: (Long) -> Unit) {
             is LoadState.Error -> item(key = "error") { Text(value.message); TextButton(onClick = viewModel::retry) { Text("重试") } }
             is LoadState.Ready -> {
                 item(key = "overview", contentType = "overview") {
-                    StudyOverview(value.value.totals, selection.period, onRecords = { showRecords = true }, onDetails = { showDetails = true })
+                    StudyOverview(value.value.current, value.value.previous, selection.period,
+                        onRecords = { showRecords = true }, onDetails = { showDetails = true })
                 }
-                item(key = "chart", contentType = "chart") { StudyTrend(value.value, selection.period) }
+                item(key = "chart", contentType = "chart") { StudyTrend(value.value.current, selection.period) }
+                item(key = "distribution", contentType = "distribution") { TaskDistribution(value.value.current) }
+                item(key = "rhythm", contentType = "rhythm") { FocusRhythm(value.value.current) }
                 item(key = "heatmap", contentType = "heatmap") {
                     when (val calendar = heatmap) {
                         is LoadState.Ready -> FocusHeatmap(calendar.value) { viewModel.viewDay(it); showRecords = true }
@@ -104,8 +120,22 @@ fun StatisticsScreen(viewModel: StatisticsViewModel, onReport: (Long) -> Unit) {
                         LoadState.Loading -> LinearProgressIndicator(Modifier.fillMaxWidth())
                     }
                 }
+                item(key = "habits", contentType = "habits") {
+                    when (val habitState = habits) {
+                        is LoadState.Ready -> HabitOverview(habitState.value)
+                        is LoadState.Error -> TextButton(onClick = viewModel::retry) { Text("习惯统计加载失败，点击重试") }
+                        LoadState.Loading -> LinearProgressIndicator(Modifier.fillMaxWidth())
+                    }
+                }
+                item(key = "records", contentType = "records") {
+                    RecentRecordsSection(value.value.current,
+                        onAdd = { editingId = null; viewModel.clearEditError(); editorOpen = true },
+                        onAll = { showRecords = true },
+                        onEdit = { editingId = it; viewModel.clearEditError(); editorOpen = true },
+                        onReport = onReport)
+                }
                 item(key = "current", contentType = "current") {
-                    TextButton(onClick = viewModel::current, modifier = Modifier.fillMaxWidth()) { Text("回到${selection.period.label}") }
+                    TextButton(onClick = viewModel::current, modifier = Modifier.fillMaxWidth()) { Text("回到当前${selection.period.unit}") }
                 }
             }
         }
@@ -116,11 +146,12 @@ fun StatisticsScreen(viewModel: StatisticsViewModel, onReport: (Long) -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 private fun PeriodDateDialog(selection: StatisticsSelection, onDismiss: () -> Unit, onConfirm: (LocalDate) -> Unit) {
     val month = selection.period == StatisticsPeriod.MONTH
+    val year = selection.period == StatisticsPeriod.YEAR
     var manual by rememberSaveable { mutableStateOf(false) }
     val configuration = LocalConfiguration.current
     // The calendar has a minimum width; use the existing text form on compact displays.
     val compact = configuration.screenWidthDp < 360 || configuration.screenHeightDp < 600 || configuration.fontScale > 1.2f
-    if (!month && !manual && !compact) {
+    if (!month && !year && !manual && !compact) {
         val today = LocalDate.now()
         val picker = rememberDatePickerState(
             initialSelectedDateMillis = selection.range.start.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
@@ -144,14 +175,26 @@ private fun PeriodDateDialog(selection: StatisticsSelection, onDismiss: () -> Un
         }
         return
     }
-    var input by rememberSaveable { mutableStateOf(if (month) YearMonth.from(selection.range.start).toString() else selection.range.start.toString()) }
-    val date = runCatching { if (month) YearMonth.parse(input.trim()).atDay(1) else LocalDate.parse(input.trim()) }.getOrNull()
+    var input by rememberSaveable { mutableStateOf(when {
+        year -> selection.range.start.year.toString()
+        month -> YearMonth.from(selection.range.start).toString()
+        else -> selection.range.start.toString()
+    }) }
+    val date = runCatching { when {
+        year -> LocalDate.of(input.trim().toInt(), 1, 1)
+        month -> YearMonth.parse(input.trim()).atDay(1)
+        else -> LocalDate.parse(input.trim())
+    } }.getOrNull()
     val valid = date != null && date <= LocalDate.now()
-    AlertDialog(onDismissRequest = onDismiss, title = { Text(if (month) "选择月份" else "选择日期") },
+    AlertDialog(onDismissRequest = onDismiss, title = { Text(when { year -> "选择年份"; month -> "选择月份"; else -> "选择日期" }) },
         text = {
             OutlinedTextField(value = input, onValueChange = { input = it.take(10) }, singleLine = true,
-                label = { Text(if (month) "月份（yyyy-MM）" else "日期（yyyy-MM-dd）") },
-                isError = !valid, supportingText = { Text(if (month) "例如 2026-09，不可选择未来月份" else "例如 2026-09-15，不可选择未来日期") })
+                label = { Text(when { year -> "年份（yyyy）"; month -> "月份（yyyy-MM）"; else -> "日期（yyyy-MM-dd）" }) },
+                isError = !valid, supportingText = { Text(when {
+                    year -> "例如 2026，不可选择未来年份"
+                    month -> "例如 2026-09，不可选择未来月份"
+                    else -> "例如 2026-09-15，不可选择未来日期"
+                }) })
         },
         confirmButton = { TextButton(enabled = valid, onClick = { date?.let(onConfirm) }) { Text("查看") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } })

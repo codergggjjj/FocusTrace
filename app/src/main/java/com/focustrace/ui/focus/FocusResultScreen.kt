@@ -3,7 +3,6 @@ package com.focustrace.ui.focus
 import androidx.compose.foundation.layout.*
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -12,6 +11,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.focustrace.focus.FocusReport
 import com.focustrace.focus.formatDuration
+import com.focustrace.statistics.isValidFocusSession
 import com.focustrace.ui.components.*
 import java.time.Instant
 import java.time.ZoneId
@@ -47,7 +47,8 @@ fun FocusResultScreen(viewModel: FocusResultViewModel, backLabel: String = "返�
 @Composable
 private fun ReportContent(report: FocusReport, modifier: Modifier) {
     val s = report.session
-    val formatter = remember { DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.systemDefault()) }
+    var showDistractions by remember { mutableStateOf(false) }
+    val formatter = remember { DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault()) }
     LazyColumn(modifier.fillMaxWidth().testTag("report-list"), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
             Text(if (report.completedPomodoro) "本轮专注完成" else "本轮已结束", style = MaterialTheme.typography.titleLarge)
@@ -55,36 +56,47 @@ private fun ReportContent(report: FocusReport, modifier: Modifier) {
             Text(if (s.type == 0) "番茄钟" else "正向计时", Modifier.padding(top = 8.dp))
         }
         item {
-            InfoCard("专注时长", "有效专注：${formatDuration(s.focusSeconds)}\n计划时长：${if (s.type == 0) formatDuration(s.plannedSeconds) else "不限时"}")
-        }
-        item {
-            Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("专注率", style = MaterialTheme.typography.titleLarge)
-                    Text(report.focusPercent?.let { "$it%" } ?: "—", style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.testTag("report-focus-percent"))
-                    Text("有效专注 ÷（有效专注 + 分心时间）")
-                    if (report.focusPercent == null) Text("累计时长不足 1 秒，暂不计算比例。")
+            Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("专注时长", style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Text(formatDuration(s.focusSeconds), style = MaterialTheme.typography.displaySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer)
+                    if (s.type == 0) Text("计划 ${formatDuration(s.plannedSeconds)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer)
+                    if (!isValidFocusSession(s)) Text("未计入统计",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer)
                 }
             }
         }
-        item { InfoCard("分心情况", "分心次数：${report.events.size} 次\n分心总时长：${formatDuration(report.distractionSeconds)}\n平均每次：${report.averageDistractionSeconds?.let(::formatDuration) ?: "—"}") }
         item {
-            val first = if (report.events.isEmpty()) "未发生分心" else report.firstDistractionSeconds?.let { "开始后 ${formatDuration(it)}" } ?: "时间不可用"
-            InfoCard("首次分心", first)
-            Text("按开始到首次离开的时间计算，包含主动暂停。", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
+            TraceCard {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    ReportMetric("专注率", report.focusPercent?.let { "$it%" } ?: "—",
+                        Modifier.weight(1f), valueTag = "report-focus-percent")
+                    ReportMetric("分心", "${report.events.size} 次", Modifier.weight(1f))
+                    ReportMetric("分心时长", formatDuration(report.distractionSeconds), Modifier.weight(1f))
+                }
+            }
         }
         item { InfoCard("起止时间", "开始：${formatter.format(Instant.ofEpochMilli(s.startTime))}\n结束：${formatter.format(Instant.ofEpochMilli(s.endTime!!))}") }
-        item { Text("分心明细", style = MaterialTheme.typography.titleLarge) }
-        if (report.events.isEmpty()) item { Text("本轮暂无分心记录。") }
-        items(report.events, key = { it.id }) { event ->
-            Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("离开：${formatter.format(Instant.ofEpochMilli(event.backgroundTime))}")
-                    Text("返回：${formatter.format(Instant.ofEpochMilli(event.foregroundTime))}")
-                    Text("持续 ${formatDuration(event.durationSeconds)}")
-                }
+        if (report.events.isNotEmpty()) item {
+            FilledTonalButton(onClick = { showDistractions = true }, modifier = Modifier.fillMaxWidth()) {
+                Text("查看分心记录")
             }
         }
-        item { Text("报告按已保存的整秒记录计算；休息时间不计入专注。", style = MaterialTheme.typography.bodySmall) }
+    }
+    if (showDistractions) DistractionHistoryDialog(report.events) { showDistractions = false }
+}
+
+@Composable
+private fun ReportMetric(label: String, value: String, modifier: Modifier = Modifier, valueTag: String? = null) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(value, style = MaterialTheme.typography.titleLarge,
+            modifier = if (valueTag == null) Modifier else Modifier.testTag(valueTag))
+        Text(label, style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

@@ -130,7 +130,7 @@ class FoundationTest {
         compose.onNodeWithText("把注意力留给重要的事").assertIsDisplayed()
         compose.onNodeWithText("专注").assertDoesNotExist()
         compose.onAllNodesWithText("统计").onFirst().performClick()
-        compose.onNodeWithText("看见专注，也理解分心").assertIsDisplayed()
+        compose.onNodeWithText("看见投入，也看见变化").assertIsDisplayed()
         compose.onAllNodesWithText("我的").onFirst().performClick()
         compose.onNodeWithText("找到适合自己的专注节奏").assertIsDisplayed()
         compose.activityRule.scenario.recreate()
@@ -149,7 +149,7 @@ class FoundationTest {
             endTime = instant(14, 11), plannedSeconds = 1800, focusSeconds = 1800, status = 4, taskTitleSnapshot = "上午学习")) }
         try {
             compose.onAllNodesWithText("统计").onFirst().performClick()
-            compose.onNodeWithText("本月").performClick()
+            compose.onNodeWithText("月").performClick()
             compose.onNodeWithText("选择月份").performClick()
             compose.onNodeWithText("月份（yyyy-MM）").performTextReplacement("2024-06")
             compose.onNodeWithText("查看").performClick()
@@ -169,8 +169,8 @@ class FoundationTest {
             compose.onNodeWithText("关闭记录").performClick()
             compose.onNodeWithTag("statistics-list").performScrollToNode(hasTestTag("statistics-range"))
             compose.onNodeWithTag("statistics-range").assertTextEquals("2024-06-12")
-            compose.onNodeWithTag("statistics-list").performScrollToNode(hasText("今日"))
-            compose.onNodeWithText("今日").performClick()
+            compose.onNodeWithTag("statistics-list").performScrollToNode(hasText("日"))
+            compose.onNodeWithText("日").performClick()
             compose.onNodeWithText("选择日期").performClick()
             compose.onNodeWithText("输入日期").performClick()
             compose.onNodeWithText("日期（yyyy-MM-dd）").performTextReplacement("2024-06-12")
@@ -229,7 +229,7 @@ class FoundationTest {
 
     @Test fun statisticsPeriodsAndHistorySurviveRecreation() {
         compose.onAllNodesWithText("统计").onFirst().performClick()
-        compose.onNodeWithText("本月").performClick()
+        compose.onNodeWithText("月").performClick()
         compose.onNodeWithContentDescription("下一月").assertIsNotEnabled()
         compose.onNodeWithContentDescription("上一月").performClick()
         val start = java.time.LocalDate.now().withDayOfMonth(1).minusMonths(1)
@@ -238,12 +238,16 @@ class FoundationTest {
         compose.activityRule.scenario.recreate()
         compose.onNodeWithText(label).assertIsDisplayed()
         compose.onNodeWithContentDescription("下一月").assertIsEnabled()
-        compose.onNodeWithTag("statistics-list").performScrollToNode(hasText("回到本月"))
-        compose.onNodeWithText("回到本月").performClick()
+        compose.onNodeWithTag("statistics-list").performScrollToNode(hasText("回到当前月"))
+        compose.onNodeWithText("回到当前月").performClick()
         compose.onNodeWithTag("statistics-list").performScrollToIndex(0)
         compose.onNodeWithContentDescription("下一月").assertIsNotEnabled()
-        compose.onNodeWithText("本周").performClick()
+        compose.onNodeWithText("周").performClick()
         compose.onNodeWithContentDescription("上一周").assertIsDisplayed()
+        compose.onNodeWithText("年").performClick()
+        compose.onNodeWithContentDescription("下一年").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("上一年").performClick()
+        compose.onNodeWithTag("statistics-range").assertTextEquals("${java.time.LocalDate.now().year - 1} 年")
     }
 
     @Test fun stopwatchTaskPersistsAndSelectsStopwatchWhenStarting() {
@@ -430,8 +434,8 @@ class FoundationTest {
             compose.waitUntil(5000) { compose.onAllNodesWithText("报告样例").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("report-list").performScrollToNode(hasTestTag("report-focus-percent"))
             compose.onNodeWithTag("report-focus-percent").assertTextEquals("88%")
-            compose.onNodeWithTag("report-list").performScrollToNode(hasText("开始后 12 分 31 秒"))
-            compose.onNodeWithText("开始后 12 分 31 秒").assertIsDisplayed()
+            compose.onNodeWithTag("report-list").performScrollToNode(hasText("查看分心记录"))
+            compose.onNodeWithText("查看分心记录").assertIsDisplayed()
             compose.activityRule.scenario.recreate()
             compose.onNodeWithText("专注报告").assertIsDisplayed()
             compose.onNodeWithTag("report-list").performScrollToNode(hasTestTag("report-focus-percent"))

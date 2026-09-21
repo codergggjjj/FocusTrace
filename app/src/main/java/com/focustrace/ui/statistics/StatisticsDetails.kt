@@ -16,6 +16,7 @@ import com.focustrace.focus.formatDuration
 import com.focustrace.statistics.*
 import com.focustrace.ui.components.*
 import java.time.Instant
+import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 @Composable
@@ -59,11 +60,68 @@ internal fun FocusDetailsDialog(totals: StatisticsTotals, onDismiss: () -> Unit)
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             DetailMetric("分心次数", "${totals.distractions} 次")
             DetailMetric("分心时间", formatDuration(totals.distractionSeconds))
-            DetailMetric("平均分心时长", totals.averageDistractionSeconds?.let(::formatDuration) ?: "—")
-            DetailMetric("平均首次分心", totals.averageFirstDistractionSeconds?.let(::formatDuration) ?: "—")
             DetailMetric("专注率", totals.focusPercent?.let { "$it%" } ?: "—")
         }
     }, confirmButton = { TextButton(onClick = onDismiss) { Text("关闭") } })
+}
+
+@Composable
+internal fun RecentRecordsSection(summary: StatisticsSummary, onAdd: () -> Unit, onAll: () -> Unit,
+    onEdit: (Long) -> Unit, onReport: (Long) -> Unit) {
+    val time = remember(summary.range.zone) { DateTimeFormatter.ofPattern("HH:mm").withZone(summary.range.zone) }
+    val records = summary.sessions.take(6)
+    StatisticsSection("专注记录", "${summary.sessions.size} 条") {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilledTonalButton(onClick = onAdd, modifier = Modifier.weight(1f)) { Text("手动补录") }
+            TextButton(onClick = onAll, modifier = Modifier.weight(1f)) { Text("查看全部") }
+        }
+        if (records.isEmpty()) {
+            Box(Modifier.fillMaxWidth().height(96.dp), contentAlignment = Alignment.Center) {
+                Text("这个周期还没有专注记录", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        } else {
+            var previousDate: LocalDate? = null
+            records.forEach { session ->
+                val date = Instant.ofEpochMilli(session.startTime).atZone(summary.range.zone).toLocalDate()
+                if (date != previousDate) {
+                    Text(recordDayLabel(date), style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    previousDate = date
+                }
+                Row(Modifier.fillMaxWidth().clickable {
+                    if (session.source == "MANUAL") onEdit(session.id) else onReport(session.id)
+                }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(Modifier.width(92.dp)) {
+                        Text("${time.format(Instant.ofEpochMilli(session.startTime))} - ${time.format(Instant.ofEpochMilli(session.endTime!!))}",
+                            style = MaterialTheme.typography.bodySmall)
+                        if (session.source == "MANUAL") Text("手动添加", style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary)
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Text(session.taskTitleSnapshot ?: "自由专注", style = MaterialTheme.typography.bodyLarge,
+                            maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                        session.note?.takeIf { it.isNotBlank() }?.let {
+                            Text(it, style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                        }
+                    }
+                    Text(compactDuration(session.focusSeconds), style = MaterialTheme.typography.labelLarge)
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .7f))
+            }
+        }
+    }
+}
+
+private fun recordDayLabel(date: LocalDate): String {
+    val today = LocalDate.now()
+    return when (date) {
+        today -> "今天"
+        today.minusDays(1) -> "昨天"
+        else -> date.toString()
+    }
 }
 
 @Composable

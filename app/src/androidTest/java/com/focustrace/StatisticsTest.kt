@@ -46,6 +46,10 @@ class StatisticsTest {
         assertEquals(LocalDate.of(2023, 1, 2), week.endExclusive)
         val month = statisticsRange(date, StatisticsPeriod.MONTH, zone)
         assertEquals(29, summarizeStatistics(emptyList(), month).days.size)
+        val year = statisticsRange(date, StatisticsPeriod.YEAR, zone)
+        assertEquals(LocalDate.of(2024, 1, 1), year.start)
+        assertEquals(LocalDate.of(2025, 1, 1), year.endExclusive)
+        assertEquals(LocalDate.of(2023, 1, 1), previousStatisticsRange(year, StatisticsPeriod.YEAR).start)
         val ny = ZoneId.of("America/New_York")
         val spring = statisticsRange(LocalDate.of(2024, 3, 10), StatisticsPeriod.DAY, ny)
         val fall = statisticsRange(LocalDate.of(2024, 11, 3), StatisticsPeriod.DAY, ny)
@@ -72,6 +76,27 @@ class StatisticsTest {
         assertTrue(result.sessions.any { it.id == fiveMinutes.session.id })
         assertEquals(0, summarizeStatistics(listOf(a), statisticsRange(date.plusDays(1), StatisticsPeriod.DAY, zone)).totals.sessions)
         assertNull(summarizeStatistics(emptyList(), range).totals.focusPercent)
+    }
+
+    @Test fun taskDistributionHoursAndHabitsComeFromValidSessions() {
+        val firstStart = date.minusDays(1).atTime(9, 0).atZone(zone).toInstant().toEpochMilli()
+        val first = row(1, 1800).copy(session = row(1, 1800).session.copy(taskId = 7, taskTitleSnapshot = "算法",
+            startTime = firstStart, endTime = firstStart + 1800000))
+        val secondDay = date
+        val secondStart = secondDay.atTime(20, 0).atZone(zone).toInstant().toEpochMilli()
+        val second = row(2, 3600).copy(session = row(2, 3600).session.copy(taskId = 7, taskTitleSnapshot = "算法",
+            startTime = secondStart, endTime = secondStart + 3600000))
+        val short = row(3, 300).copy(session = row(3, 300).session.copy(taskTitleSnapshot = "不应计入"))
+        val range = statisticsRange(date, StatisticsPeriod.MONTH, zone)
+        val result = summarizeStatistics(listOf(first, second, short), range)
+        assertEquals(1, result.taskDistribution.size)
+        assertEquals("算法", result.taskDistribution.single().title)
+        assertEquals(5400L, result.taskDistribution.single().focusSeconds)
+        assertEquals(3600L, result.hours[20].focusSeconds)
+        val habits = summarizeHabits(listOf(first.session, second.session, short.session), secondDay, zone)
+        assertEquals(2, habits.currentStreak)
+        assertEquals(2, habits.longestStreak)
+        assertEquals(2, habits.focusedDaysInMonth)
     }
 
     @Test fun roomStatisticsObserveUpdatedRecords() = runBlocking {
