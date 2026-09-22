@@ -164,11 +164,17 @@ class FoundationTest {
             }
             compose.onNodeWithTag("statistics-list").performScrollToNode(hasTestTag("heat-day-2024-06-12"))
             compose.onNodeWithTag("heat-day-2024-06-12").performClick()
-            compose.onNodeWithText("学习时间：1 时 0 分 0 秒").assertIsDisplayed()
-            compose.onNodeWithText("查看当天记录").performClick()
-            compose.onNodeWithText("关闭记录").performClick()
+            compose.waitUntil(5000) {
+                compose.onAllNodes(hasTestTag("heat-day-2024-06-12") and isSelected())
+                    .fetchSemanticsNodes().isNotEmpty()
+            }
+            compose.onNodeWithTag("focus-heatmap").assertIsDisplayed()
             compose.onNodeWithTag("statistics-list").performScrollToNode(hasTestTag("statistics-range"))
             compose.onNodeWithTag("statistics-range").assertTextEquals("2024-06-12")
+            compose.onNodeWithTag("statistics-list").performScrollToNode(hasTestTag("heat-day-2024-06-12"))
+            compose.onNodeWithTag("heat-day-2024-06-12").assertIsSelected()
+            compose.onNodeWithTag("statistics-list").performScrollToNode(hasTestTag("study-total"))
+            compose.onNodeWithTag("study-total").assertTextEquals("1 小时 0 分")
             compose.onNodeWithTag("statistics-list").performScrollToNode(hasText("日"))
             compose.onNodeWithText("日").performClick()
             compose.onNodeWithText("选择日期").performClick()

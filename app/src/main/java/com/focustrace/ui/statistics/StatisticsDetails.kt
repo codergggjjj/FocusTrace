@@ -37,7 +37,10 @@ internal fun StudyRecordsDialog(state: LoadState<StatisticsSummary>, onDismiss: 
                         TraceCard(Modifier.testTag("study-session-${session.id}").clickable {
                             if (session.source == "MANUAL") onEdit(session.id) else onReport(session.id)
                         }) {
-                            if (session.source == "MANUAL") Text("手动添加", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                            Text(if (session.source == "MANUAL") "手动添加" else "计时记录",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (session.source == "MANUAL") MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(session.taskTitleSnapshot ?: "自由专注 / 原待办不可用", style = MaterialTheme.typography.titleMedium)
                             Text(compactDuration(session.focusSeconds), color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
                             Text("开始：${formatter.format(Instant.ofEpochMilli(session.startTime))}", style = MaterialTheme.typography.bodySmall)
@@ -66,7 +69,7 @@ internal fun FocusDetailsDialog(totals: StatisticsTotals, onDismiss: () -> Unit)
 internal fun RecentRecordsSection(summary: StatisticsSummary, onAdd: () -> Unit, onAll: () -> Unit,
     onEdit: (Long) -> Unit, onReport: (Long) -> Unit) {
     val time = remember(summary.range.zone) { DateTimeFormatter.ofPattern("HH:mm").withZone(summary.range.zone) }
-    val records = summary.sessions.take(6)
+    val records = summary.sessions.take(4)
     StatisticsSection("专注记录", "${summary.sessions.size} 条") {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilledTonalButton(onClick = onAdd, modifier = Modifier.weight(1f)) { Text("手动补录") }
@@ -92,8 +95,10 @@ internal fun RecentRecordsSection(summary: StatisticsSummary, onAdd: () -> Unit,
                     Column(Modifier.width(92.dp)) {
                         Text("${time.format(Instant.ofEpochMilli(session.startTime))} - ${time.format(Instant.ofEpochMilli(session.endTime!!))}",
                             style = MaterialTheme.typography.bodySmall)
-                        if (session.source == "MANUAL") Text("手动添加", style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary)
+                        Text(if (session.source == "MANUAL") "手动" else "计时",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (session.source == "MANUAL") MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Column(Modifier.weight(1f)) {
                         Text(session.taskTitleSnapshot ?: "自由专注", style = MaterialTheme.typography.bodyLarge,

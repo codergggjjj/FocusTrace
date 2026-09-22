@@ -1,9 +1,11 @@
 package com.focustrace.ui.statistics
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
@@ -41,6 +43,7 @@ fun StatisticsScreen(viewModel: StatisticsViewModel, onReport: (Long) -> Unit) {
     val busy by viewModel.saving.collectAsStateWithLifecycle()
     val editError by viewModel.editError.collectAsStateWithLifecycle()
     val taskList = (tasks as? LoadState.Ready)?.value.orEmpty()
+    val listState = rememberLazyListState()
     if (showDate) PeriodDateDialog(selection, onDismiss = { showDate = false }) {
         viewModel.selectDate(it); showDate = false
     }
@@ -65,9 +68,11 @@ fun StatisticsScreen(viewModel: StatisticsViewModel, onReport: (Long) -> Unit) {
     if (showRules) AlertDialog(onDismissRequest = { showRules = false }, title = { Text("统计说明") },
         text = { Text("只有严格超过 5 分钟的已结束专注才会生成记录并计入统计。") },
         confirmButton = { TextButton(onClick = { showRules = false }) { Text("知道了") } })
-    LazyColumn(Modifier.fillMaxSize().testTag("statistics-list"),
-        contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)) {
+    LazyColumn(Modifier.fillMaxSize()
+        .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = .42f))
+        .testTag("statistics-list"), state = listState,
+        contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp)) {
         item(key = "header", contentType = "header") {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
@@ -78,51 +83,56 @@ fun StatisticsScreen(viewModel: StatisticsViewModel, onReport: (Long) -> Unit) {
             }
         }
         item(key = "period", contentType = "period") {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                    StatisticsPeriod.entries.forEachIndexed { index, period ->
-                        SegmentedButton(selected = selection.period == period,
-                            colors = SegmentedButtonDefaults.colors(activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer),
-                            shape = SegmentedButtonDefaults.itemShape(index, StatisticsPeriod.entries.size), icon = {},
-                            onClick = { viewModel.choose(period) }) { Text(period.label) }
-                    }
-                }
-                Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .48f)) {
-                    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = { viewModel.shift(-1) }) {
-                            Icon(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, "上一${selection.period.unit}")
+            Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(if (taskList.isEmpty()) "统计范围" else "时间范围 / 待办筛选",
+                        style = MaterialTheme.typography.titleMedium)
+                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                        StatisticsPeriod.entries.forEachIndexed { index, period ->
+                            SegmentedButton(selected = selection.period == period,
+                                colors = SegmentedButtonDefaults.colors(activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                    activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer),
+                                shape = SegmentedButtonDefaults.itemShape(index, StatisticsPeriod.entries.size), icon = {},
+                                onClick = { viewModel.choose(period) }) { Text(period.label) }
                         }
-                        Row(Modifier.weight(1f), horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically) {
-                            Text(when (selection.period) {
-                                StatisticsPeriod.DAY -> selection.range.start.toString()
-                                StatisticsPeriod.MONTH -> "${selection.range.start.year} 年 ${selection.range.start.monthValue} 月"
-                                StatisticsPeriod.YEAR -> "${selection.range.start.year} 年"
-                                StatisticsPeriod.WEEK -> {
-                                    val end = selection.range.endExclusive.minusDays(1)
-                                    "${selection.range.start.monthValue}/${selection.range.start.dayOfMonth} - ${end.monthValue}/${end.dayOfMonth}"
-                                }
-                            }, style = MaterialTheme.typography.titleSmall,
-                                modifier = Modifier.testTag("statistics-range"))
-                            TextButton(onClick = { showDate = true }, contentPadding = PaddingValues(horizontal = 8.dp),
-                                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)) {
+                    }
+                    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .48f)) {
+                        Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = { viewModel.shift(-1) }) {
+                                Icon(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, "上一${selection.period.unit}")
+                            }
+                            Row(Modifier.weight(1f), horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically) {
                                 Text(when (selection.period) {
-                                    StatisticsPeriod.MONTH -> "选择月份"
-                                    StatisticsPeriod.YEAR -> "选择年份"
-                                    else -> "选择日期"
-                                })
+                                    StatisticsPeriod.DAY -> selection.range.start.toString()
+                                    StatisticsPeriod.MONTH -> "${selection.range.start.year} 年 ${selection.range.start.monthValue} 月"
+                                    StatisticsPeriod.YEAR -> "${selection.range.start.year} 年"
+                                    StatisticsPeriod.WEEK -> {
+                                        val end = selection.range.endExclusive.minusDays(1)
+                                        "${selection.range.start.monthValue}/${selection.range.start.dayOfMonth} - ${end.monthValue}/${end.dayOfMonth}"
+                                    }
+                                }, style = MaterialTheme.typography.titleSmall,
+                                    modifier = Modifier.testTag("statistics-range"))
+                                TextButton(onClick = { showDate = true }, contentPadding = PaddingValues(horizontal = 8.dp),
+                                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)) {
+                                    Text(when (selection.period) {
+                                        StatisticsPeriod.MONTH -> "选择月份"
+                                        StatisticsPeriod.YEAR -> "选择年份"
+                                        else -> "选择日期"
+                                    })
+                                }
+                            }
+                            IconButton(onClick = { viewModel.shift(1) }, enabled = selection.canNext) {
+                                Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, "下一${selection.period.unit}")
                             }
                         }
-                        IconButton(onClick = { viewModel.shift(1) }, enabled = selection.canNext) {
-                            Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, "下一${selection.period.unit}")
-                        }
+                    }
+                    if (taskList.isNotEmpty()) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .55f))
+                        StatisticsTaskFilter(taskList, selectedTaskId, viewModel::selectTask)
                     }
                 }
             }
-        }
-        if (taskList.isNotEmpty()) item(key = "task-filter", contentType = "filter") {
-            StatisticsTaskFilter(taskList, selectedTaskId, viewModel::selectTask)
         }
         when (val value = state) {
             LoadState.Loading -> item(key = "loading") { LinearProgressIndicator(Modifier.fillMaxWidth()) }
@@ -137,7 +147,10 @@ fun StatisticsScreen(viewModel: StatisticsViewModel, onReport: (Long) -> Unit) {
                 item(key = "rhythm", contentType = "rhythm") { FocusRhythm(value.value.current) }
                 item(key = "heatmap", contentType = "heatmap") {
                     when (val calendar = heatmap) {
-                        is LoadState.Ready -> FocusHeatmap(calendar.value) { viewModel.viewDay(it); showRecords = true }
+                        is LoadState.Ready -> FocusHeatmap(
+                            summary = calendar.value,
+                            selectedDate = selection.range.start.takeIf { selection.period == StatisticsPeriod.DAY },
+                            onSelectDay = viewModel::viewDay)
                         is LoadState.Error -> TextButton(onClick = viewModel::retry) { Text("热力图加载失败，点击重试") }
                         LoadState.Loading -> LinearProgressIndicator(Modifier.fillMaxWidth())
                     }

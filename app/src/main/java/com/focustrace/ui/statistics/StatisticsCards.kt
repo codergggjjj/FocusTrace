@@ -151,6 +151,7 @@ internal fun StudyTrend(summary: StatisticsSummary, period: StatisticsPeriod) {
             }
             Text("${points[activeIndex].fullLabel} · ${compactDuration(points[activeIndex].seconds)}",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .55f))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                 SmallMetric("最高专注", peak?.let { "${it.shortLabel} · ${compactDuration(it.seconds)}" } ?: "—", Modifier.weight(1f))
                 SmallMetric("平均", compactDuration(average), Modifier.weight(1f))
@@ -171,9 +172,9 @@ private fun TrendBar(point: TrendPoint, maximum: Long, selected: Boolean, onClic
     }, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(if (point.seconds == 0L) "" else if (point.seconds < 60) "<1" else "${point.seconds / 60}",
             style = MaterialTheme.typography.labelSmall, maxLines = 1)
-        Box(Modifier.height(96.dp).fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
+        Box(Modifier.height(88.dp).fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
             Box(Modifier.width(20.dp)
-                .height((96f * point.seconds.toFloat() / maximum).coerceAtLeast(if (point.seconds > 0) 4f else 0f).dp)
+                .height((88f * point.seconds.toFloat() / maximum).coerceAtLeast(if (point.seconds > 0) 4f else 0f).dp)
                 .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp)).background(color))
         }
         Text(point.shortLabel, style = MaterialTheme.typography.labelSmall, maxLines = 1)
@@ -183,7 +184,7 @@ private fun TrendBar(point: TrendPoint, maximum: Long, selected: Boolean, onClic
 @Composable
 private fun CompactHourBars(points: List<TrendPoint>, maximum: Long, selected: Int,
     onSelect: (Int) -> Unit, testTag: String) {
-    Row(Modifier.fillMaxWidth().height(108.dp).testTag(testTag), horizontalArrangement = Arrangement.spacedBy(1.dp)) {
+    Row(Modifier.fillMaxWidth().height(104.dp).testTag(testTag), horizontalArrangement = Arrangement.spacedBy(1.dp)) {
         points.forEachIndexed { index, point ->
             val color = when {
                 index == selected -> MaterialTheme.colorScheme.primary
@@ -195,7 +196,7 @@ private fun CompactHourBars(points: List<TrendPoint>, maximum: Long, selected: I
             }, horizontalAlignment = Alignment.CenterHorizontally) {
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
                     Box(Modifier.width(6.dp)
-                        .height((84f * point.seconds.toFloat() / maximum).coerceAtLeast(if (point.seconds > 0) 3f else 0f).dp)
+                        .height((80f * point.seconds.toFloat() / maximum).coerceAtLeast(if (point.seconds > 0) 3f else 0f).dp)
                         .clip(RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp)).background(color))
                 }
                 if (index % 2 == 0) Text("$index", style = MaterialTheme.typography.labelSmall, maxLines = 1)
@@ -297,13 +298,19 @@ private fun HabitMetric(value: String, label: String, modifier: Modifier, emphas
 
 @Composable
 internal fun StatisticsSection(title: String, subtitle: String? = null, content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.weight(1f))
-            subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    Surface(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surface) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f))
+                subtitle?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            content()
         }
-        content()
     }
 }
 

@@ -62,7 +62,7 @@ class StatisticsViewModel(repository: StatisticsRepository,
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), selection(period.value, anchor.value, LocalDate.now(), ZoneId.systemDefault()))
     val uiState = combine(selection, selectedTaskId, reload) { selected, taskId, _ -> selected to taskId }
         .flatMapLatest { (selected, taskId) ->
-        repository.dashboard(selected.range, selected.period, taskId).asLoadState().onStart { emit(LoadState.Loading) }
+        repository.dashboard(selected.range, selected.period, taskId).asLoadState()
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), LoadState.Loading)
     val habits = combine(calendar, selectedTaskId, reload) { current, taskId, _ -> current to taskId }
         .flatMapLatest { (current, taskId) ->
@@ -76,7 +76,7 @@ class StatisticsViewModel(repository: StatisticsRepository,
         } else selected.range.start
         Triple(statisticsRange(monthAnchor, StatisticsPeriod.MONTH, selected.range.zone), taskId, attempt)
     }.distinctUntilChanged().flatMapLatest { (range, taskId, _) ->
-        repository.statistics(range, taskId).asLoadState().onStart { emit(LoadState.Loading) }
+        repository.statistics(range, taskId).asLoadState()
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), LoadState.Loading)
     fun viewDay(date: LocalDate) {
         savedState["statisticsAnchor"] = date.toEpochDay()

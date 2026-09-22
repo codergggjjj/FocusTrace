@@ -2,7 +2,7 @@
 
 记录每一次专注，也看见每一次分心。
 
-[下载 FocusTrace v1.0.7 APK](https://github.com/codergggjjj/FocusTrace/releases/download/v1.0.7/FocusTrace-v1.0.7-performance.apk) · [发布范围与说明](docs/release-v1.0.7.md)
+[下载 FocusTrace v1.0.8 APK](https://github.com/codergggjjj/FocusTrace/releases/download/v1.0.8/FocusTrace-v1.0.8-performance.apk) · [发布范围与说明](docs/release-v1.0.8.md)
 
 此版本使用 debug 签名，面向 Android 8.0 及以上，按当前已实现功能发布。
 
@@ -101,4 +101,4 @@ docs/                阶段说明与验证结果
 
 统计页支持指定日期或月份查询累计学习时间，并查看每次学习的开始、结束时间及详细报告。
 
-热力图随统计区间显示对应月份，点击日期可查看当天数据与记录。我的→编辑设置可修改默认番茄/休息时长、分心阈值、自动休息、自动下一轮、完成提示音及浅色/深色/跟随系统；保存后持久化，默认番茄时长用于新建待办。
+热力图随统计区间显示对应月份，点击日期会直接切换到该日并同步刷新整页统计。我的→编辑设置可修改默认番茄/休息时长、分心阈值、自动休息、自动下一轮、完成提示音及浅色/深色/跟随系统；保存后持久化，默认番茄时长用于新建待办。
