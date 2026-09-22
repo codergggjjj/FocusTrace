@@ -76,11 +76,12 @@ class FocusViewModel(private val container: AppContainer) : ViewModel() {
         require(minutes in 1..1440 && rest in 1..1440)
         val settings = _state.value.settings
         engine.start(taskId, minutes * 60L, rest * 60L, settings.autoStartBreak, settings.autoStartFocus)
+        container.startTimerNotification()
     }
-    fun startStopwatch(taskId: Long?) = action { engine.startStopwatch(taskId) }
+    fun startStopwatch(taskId: Long?) = action { engine.startStopwatch(taskId); container.startTimerNotification() }
     fun setThreshold(seconds: Int) = action { container.settingsRepository.setDistractionThreshold(seconds) }
     fun pause() = action { engine.pause() }
     fun resume() = action { engine.resume() }
     fun finish() = action { engine.finish() }
-    fun rest() = action { engine.rest() }
+    fun rest() = action { engine.rest(); container.startTimerNotification() }
 }

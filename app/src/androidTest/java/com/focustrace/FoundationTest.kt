@@ -62,7 +62,7 @@ class FoundationTest {
             compose.onNodeWithText("手动添加记录").performClick()
             compose.onNodeWithText("日期（yyyy-MM-dd）").performTextReplacement("2024-06-12")
             compose.onNodeWithText("开始时间（HH:mm）").performTextReplacement("14:00")
-            compose.onNodeWithText("专注时长（分钟）").performTextReplacement("0")
+            compose.onNodeWithText("专注时长（分钟）").performTextReplacement("5")
             compose.onNodeWithText("保存记录").assertIsNotEnabled()
             compose.onNodeWithText("专注时长（分钟）").performTextReplacement("120")
             compose.onNodeWithText("专注时长：2 时 0 分 0 秒").assertExists()
@@ -344,7 +344,9 @@ class FoundationTest {
         val editedId = runBlocking { ApplicationProvider.getApplicationContext<FocusTraceApplication>()
             .container.database.taskDao().getAll().first().first { it.title == "修改后的任务" }.id }
         compose.onNodeWithTag("complete-task-$editedId").performClick()
-        compose.waitUntil(5_000) { compose.onAllNodesWithText("已完成").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("已完成 1").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("todo-filter-completed").performClick()
+        compose.onNodeWithText("修改后的任务").assertIsDisplayed()
         compose.onNodeWithTag("delete-task-$editedId").assertDoesNotExist()
         compose.onNodeWithText("修改后的任务").performClick()
         compose.onNodeWithTag("delete-task-$editedId").performClick()

@@ -44,6 +44,9 @@ class UiPolishTest {
                 runBlocking { repo.update(original.copy(darkMode = mode)) }
                 compose.onAllNodesWithText("待办").onFirst().performClick()
                 compose.onNodeWithTag("todo-list").performScrollToIndex(0)
+                compose.onNodeWithText("今日概览").assertIsDisplayed()
+                compose.onNodeWithText("2h 15m").assertIsDisplayed()
+                compose.onNodeWithTag("todo-filter-pending").assertIsSelected()
                 compose.onNodeWithContentDescription("创建待办").assertIsDisplayed()
                 compose.onNodeWithTag("todo-list").performScrollToNode(hasTestTag("start-task-${taskIds.first()}"))
                 compose.onNodeWithTag("start-task-${taskIds.first()}").assertIsDisplayed()
@@ -56,6 +59,11 @@ class UiPolishTest {
                 compose.onNodeWithText("周").assertIsSelected()
                 compose.onNodeWithText("日").performClick()
                 compose.onNodeWithTag("statistics-list").performScrollToIndex(0)
+                compose.onNodeWithTag("statistics-filter-${taskIds.first()}").performClick()
+                compose.waitUntil(5_000) { compose.onAllNodesWithText("2 小时 15 分").fetchSemanticsNodes().isNotEmpty() }
+                compose.onNodeWithTag("statistics-filter-${taskIds.last()}").performClick()
+                compose.waitUntil(5_000) { compose.onAllNodesWithText("0 分钟").fetchSemanticsNodes().isNotEmpty() }
+                compose.onNodeWithTag("statistics-filter-all").performClick()
                 capture("statistics-${mode.name}")
                 compose.onNodeWithText("选择日期").performClick()
                 compose.onNodeWithText("查看").assertIsEnabled()

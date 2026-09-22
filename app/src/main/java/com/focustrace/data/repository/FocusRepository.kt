@@ -24,7 +24,9 @@ class FocusRepository(private val sessions: FocusSessionDao, private val distrac
     }
     fun taskFocusSeconds(taskId: Long) = sessions.observeTaskFocusSeconds(taskId)
     fun reportFor(id: Long) = sessions.observeReport(id).distinctUntilChanged()
-        .map { it?.let(com.focustrace.focus.FocusReport::from) }.flowOn(Dispatchers.Default)
+        .map { row -> row?.takeIf { com.focustrace.statistics.isValidFocusSession(it.session) }
+            ?.let(com.focustrace.focus.FocusReport::from) }
+        .flowOn(Dispatchers.Default)
     val allSessions = sessions.getAll()
     suspend fun create(session: FocusSessionEntity) = sessions.insert(session)
     suspend fun update(session: FocusSessionEntity) = sessions.update(session)

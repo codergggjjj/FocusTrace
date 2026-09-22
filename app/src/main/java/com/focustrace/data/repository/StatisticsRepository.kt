@@ -12,16 +12,17 @@ import java.time.ZoneId
 
 class StatisticsRepository(private val sessions: FocusSessionDao) {
     fun sessionsBetween(start: Long, end: Long) = sessions.getSessionsBetween(start, end)
-    fun statistics(range: StatisticsRange) = sessions.observeStatistics(range.startMillis, range.endMillis)
+    fun statistics(range: StatisticsRange) = statistics(range, null)
+    fun statistics(range: StatisticsRange, taskId: Long?) = sessions.observeStatistics(range.startMillis, range.endMillis)
         .distinctUntilChanged()
-        .map { summarizeStatistics(it, range) }
+        .map { summarizeStatistics(it, range, taskId) }
         .flowOn(Dispatchers.Default)
-    fun dashboard(range: StatisticsRange, period: StatisticsPeriod) = combine(
-        statistics(range), statistics(previousStatisticsRange(range, period))
+    fun dashboard(range: StatisticsRange, period: StatisticsPeriod, taskId: Long? = null) = combine(
+        statistics(range, taskId), statistics(previousStatisticsRange(range, period), taskId)
     ) { current, previous -> StatisticsDashboard(current, previous) }
         .flowOn(Dispatchers.Default)
-    fun habits(today: LocalDate, zone: ZoneId) = sessions.observeValidSessions()
+    fun habits(today: LocalDate, zone: ZoneId, taskId: Long? = null) = sessions.observeValidSessions()
         .distinctUntilChanged()
-        .map { summarizeHabits(it, today, zone) }
+        .map { summarizeHabits(it, today, zone, taskId) }
         .flowOn(Dispatchers.Default)
 }

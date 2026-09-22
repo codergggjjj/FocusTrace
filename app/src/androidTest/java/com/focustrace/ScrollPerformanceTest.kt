@@ -33,7 +33,7 @@ class ScrollPerformanceTest {
                 }
                 repeat(1000) { index ->
                     val s = FocusSessionEntity(taskId = tasks[index % 300].id, type = 0, startTime = start + index * 1000L,
-                        endTime = start + index * 1000L + 60000, plannedSeconds = 60, focusSeconds = 60, status = 4, taskTitleSnapshot = "性能专注 $index")
+                        endTime = start + index * 1000L + 301000, plannedSeconds = 301, focusSeconds = 301, status = 4, taskTitleSnapshot = "性能专注 $index")
                     sessions += s.copy(id = db.focusSessionDao().insert(s))
                 }
             } }

@@ -10,7 +10,7 @@ data class ManualFocusInput(val date: LocalDate, val startMillis: Long, val endM
 
 fun manualEndTime(startText: String, minutesText: String): String {
     val minutes = minutesText.trim().toLongOrNull()
-    require(minutes != null && minutes in 1..1439) { "专注时长请输入 1–1439 分钟" }
+    require(minutes != null && minutes in 6..1439) { "专注时长必须大于 5 分钟" }
     val start = try { LocalTime.parse(startText.trim(), DateTimeFormatter.ofPattern("HH:mm").withResolverStyle(ResolverStyle.STRICT)) }
         catch (_: Exception) { throw IllegalArgumentException("请输入有效开始时间，格式为 HH:mm") }
     require(start.toSecondOfDay() / 60 + minutes < 1440) { "结束时间必须在当天 24:00 前，暂不支持跨天记录" }
@@ -34,6 +34,6 @@ fun parseManualFocusInput(dateText: String, startText: String, endText: String,
         return local.atZone(zone).toInstant().toEpochMilli()
     }
     val result = ManualFocusInput(date, instant(start), instant(end))
-    require(result.seconds > 0) { "专注时长必须大于 0" }
+    require(result.seconds > 300) { "专注时长必须大于 5 分钟" }
     return result
 }

@@ -50,6 +50,10 @@ fun ProfileScreen(viewModel: SettingsViewModel) {
                 SettingSwitch(Icons.Outlined.Replay, "自动开始下一轮", settings.autoStartFocus, !busy) {
                     viewModel.save(settings.copy(autoStartFocus = it)) {}
                 }
+                SettingsDivider()
+                SettingSwitch(Icons.Outlined.NotificationsActive, "完成提示音", settings.soundEnabled, !busy) {
+                    viewModel.save(settings.copy(soundEnabled = it)) {}
+                }
             }
             Column {
                 SettingsSection("外观")

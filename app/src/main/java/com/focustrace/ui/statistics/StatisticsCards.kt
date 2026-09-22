@@ -34,7 +34,7 @@ internal fun compactDuration(seconds: Long): String = when {
 }
 
 @Composable
-internal fun StudyOverview(current: StatisticsSummary, previous: StatisticsSummary, period: StatisticsPeriod,
+internal fun StudyOverview(current: StatisticsSummary, previous: StatisticsSummary,
     onRecords: () -> Unit, onDetails: () -> Unit) {
     val totals = current.totals
     val comparison = remember(totals.focusSeconds, previous.totals.focusSeconds) {
@@ -51,13 +51,12 @@ internal fun StudyOverview(current: StatisticsSummary, previous: StatisticsSumma
     val elapsedDays = current.days.count { it.date <= today }.coerceAtLeast(1)
     val averageDay = totals.focusSeconds / elapsedDays
     val averageSession = if (totals.sessions == 0) 0 else totals.focusSeconds / totals.sessions
-    val taskCount = current.taskDistribution.count { it.title != "自由专注" }
     Card(shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
         modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("${period.label}专注", style = MaterialTheme.typography.labelLarge,
+                Text("累计学习时间", style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = .75f))
                 Text(compactDuration(totals.focusSeconds), style = MaterialTheme.typography.displaySmall,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -70,21 +69,24 @@ internal fun StudyOverview(current: StatisticsSummary, previous: StatisticsSumma
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OverviewNumber("${totals.sessions}", "专注次数", Modifier.weight(1f))
                 OverviewNumber("${totals.pomodoros}", "完成番茄", Modifier.weight(1f))
-                OverviewNumber("$taskCount", "关联待办", Modifier.weight(1f))
+                OverviewNumber(totals.focusPercent?.let { "$it%" } ?: "—", "专注率", Modifier.weight(1f))
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = .12f))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OverviewNumber(compactDuration(averageDay), "日均专注", Modifier.weight(1f), compact = true)
                 OverviewNumber(compactDuration(averageSession), "单次平均", Modifier.weight(1f), compact = true)
             }
-            FilledTonalButton(onClick = onRecords, modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.surface,
-                    contentColor = MaterialTheme.colorScheme.onSurface)) { Text("查看专注记录") }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = onRecords, modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onPrimaryContainer)) {
+                    Text("查看专注记录")
+                }
+                TextButton(onClick = onDetails, modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onPrimaryContainer)) {
+                    Text("分心详情")
+                }
+            }
         }
-    }
-    TextButton(onClick = onDetails, modifier = Modifier.fillMaxWidth(),
-        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)) {
-        Text("专注率 ${totals.focusPercent?.let { "$it%" } ?: "—"} · 分心 ${totals.distractions} 次")
     }
 }
 
@@ -129,18 +131,22 @@ internal fun StudyTrend(summary: StatisticsSummary, period: StatisticsPeriod) {
     val maximum = remember(points) { points.maxOfOrNull { it.seconds }?.coerceAtLeast(1) ?: 1 }
     val average = remember(points) { if (points.isEmpty()) 0 else points.sumOf { it.seconds } / points.size }
     val peak = remember(points) { points.maxByOrNull { it.seconds } }
-    StatisticsSection("专注趋势", if (period == StatisticsPeriod.DAY) "按开始时段" else "专注时长") {
+    StatisticsSection("专注趋势", if (period == StatisticsPeriod.DAY) "按实际覆盖小时" else "专注时长") {
         if (points.all { it.seconds == 0L }) EmptyChart("这个周期还没有有效专注")
         else {
-            val listState = rememberLazyListState()
-            LaunchedEffect(summary.range.start, period) {
-                withFrameNanos { }
-                listState.scrollToItem((activeIndex - 2).coerceAtLeast(0))
-            }
-            LazyRow(state = listState, horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth().testTag("trend-bars")) {
-                itemsIndexed(points, key = { _, point -> point.key }, contentType = { _, _ -> "bar" }) { index, point ->
-                    TrendBar(point, maximum, activeIndex == index) { selected = index }
+            if (period == StatisticsPeriod.DAY) {
+                CompactHourBars(points, maximum, activeIndex, { selected = it }, "trend-bars")
+            } else {
+                val listState = rememberLazyListState()
+                LaunchedEffect(summary.range.start, period) {
+                    withFrameNanos { }
+                    listState.scrollToItem((activeIndex - 2).coerceAtLeast(0))
+                }
+                LazyRow(state = listState, horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth().testTag("trend-bars")) {
+                    itemsIndexed(points, key = { _, point -> point.key }, contentType = { _, _ -> "bar" }) { index, point ->
+                        TrendBar(point, maximum, activeIndex == index) { selected = index }
+                    }
                 }
             }
             Text("${points[activeIndex].fullLabel} · ${compactDuration(points[activeIndex].seconds)}",
@@ -157,20 +163,45 @@ internal fun StudyTrend(summary: StatisticsSummary, period: StatisticsPeriod) {
 private fun TrendBar(point: TrendPoint, maximum: Long, selected: Boolean, onClick: () -> Unit) {
     val color = when {
         selected -> MaterialTheme.colorScheme.primary
-        point.current -> MaterialTheme.colorScheme.secondary
-        else -> MaterialTheme.colorScheme.primary.copy(alpha = .32f)
+        point.current -> MaterialTheme.colorScheme.primary.copy(alpha = .58f)
+        else -> MaterialTheme.colorScheme.primary.copy(alpha = .28f)
     }
-    Column(Modifier.width(46.dp).clickable(onClick = onClick).semantics {
+    Column(Modifier.width(42.dp).clickable(onClick = onClick).semantics {
         contentDescription = "${point.fullLabel}，${formatDuration(point.seconds)}"
-    }, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    }, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(if (point.seconds == 0L) "" else if (point.seconds < 60) "<1" else "${point.seconds / 60}",
             style = MaterialTheme.typography.labelSmall, maxLines = 1)
-        Box(Modifier.height(112.dp).fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
-            Box(Modifier.width(24.dp)
-                .height((112f * point.seconds.toFloat() / maximum).coerceAtLeast(if (point.seconds > 0) 4f else 0f).dp)
-                .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)).background(color))
+        Box(Modifier.height(96.dp).fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
+            Box(Modifier.width(20.dp)
+                .height((96f * point.seconds.toFloat() / maximum).coerceAtLeast(if (point.seconds > 0) 4f else 0f).dp)
+                .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp)).background(color))
         }
         Text(point.shortLabel, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+    }
+}
+
+@Composable
+private fun CompactHourBars(points: List<TrendPoint>, maximum: Long, selected: Int,
+    onSelect: (Int) -> Unit, testTag: String) {
+    Row(Modifier.fillMaxWidth().height(108.dp).testTag(testTag), horizontalArrangement = Arrangement.spacedBy(1.dp)) {
+        points.forEachIndexed { index, point ->
+            val color = when {
+                index == selected -> MaterialTheme.colorScheme.primary
+                point.current -> MaterialTheme.colorScheme.primary.copy(alpha = .58f)
+                else -> MaterialTheme.colorScheme.primary.copy(alpha = .24f)
+            }
+            Column(Modifier.weight(1f).fillMaxHeight().clickable { onSelect(index) }.semantics {
+                contentDescription = "${point.fullLabel}，${formatDuration(point.seconds)}"
+            }, horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
+                    Box(Modifier.width(6.dp)
+                        .height((84f * point.seconds.toFloat() / maximum).coerceAtLeast(if (point.seconds > 0) 3f else 0f).dp)
+                        .clip(RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp)).background(color))
+                }
+                if (index % 2 == 0) Text("$index", style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                else Spacer(Modifier.height(16.dp))
+            }
+        }
     }
 }
 
@@ -194,7 +225,7 @@ internal fun TaskDistribution(summary: StatisticsSummary) {
                 }
                 LinearProgressIndicator(progress = { ratio.coerceIn(0f, 1f) },
                     modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
-                    color = if (index == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
+                    color = if (index == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = .55f),
                     trackColor = MaterialTheme.colorScheme.surfaceVariant)
             }
         }
@@ -218,28 +249,27 @@ internal fun TaskDistribution(summary: StatisticsSummary) {
 internal fun FocusRhythm(summary: StatisticsSummary) {
     val values = remember(summary.hours) { summary.hours.map { it.focusSeconds } }
     val max = remember(values) { values.maxOrNull()?.coerceAtLeast(1) ?: 1 }
-    val peakStart = remember(values) {
-        if (values.all { it == 0L }) null else (0..22).maxByOrNull { values[it] + values[it + 1] }
+    val peakHour = remember(values) {
+        if (values.all { it == 0L }) null else values.indices.maxByOrNull { values[it] }
     }
-    StatisticsSection("专注时间分布", "一天中的开始时段") {
+    var selectedHour by rememberSaveable(summary.range.start.toString(), summary.range.endExclusive.toString()) {
+        mutableIntStateOf(peakHour ?: 0)
+    }
+    val points = remember(values) {
+        values.mapIndexed { hour, seconds ->
+            TrendPoint("rhythm-$hour", "$hour", "%02d:00 - %02d:00".format(hour, hour + 1), seconds, false)
+        }
+    }
+    StatisticsSection("专注时间分布", "按实际覆盖时段") {
         if (values.all { it == 0L }) EmptyChart("有记录后，这里会显示你的专注规律")
         else {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(5.dp), modifier = Modifier.fillMaxWidth()) {
-                itemsIndexed(values, key = { hour, _ -> hour }) { hour, seconds ->
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        Box(Modifier.width(22.dp).height(76.dp), contentAlignment = Alignment.BottomCenter) {
-                            Box(Modifier.fillMaxWidth().height((76f * seconds / max).coerceAtLeast(if (seconds > 0) 3f else 0f).dp)
-                                .clip(RoundedCornerShape(topStart = 5.dp, topEnd = 5.dp))
-                                .background(MaterialTheme.colorScheme.secondary.copy(alpha = if (seconds == max) 1f else .45f)))
-                        }
-                        if (hour % 3 == 0) Text("$hour", style = MaterialTheme.typography.labelSmall)
-                        else Spacer(Modifier.height(16.dp))
-                    }
-                }
-            }
-            peakStart?.let {
-                Text("这个周期最常在 %02d:00 - %02d:00 开始专注".format(it, it + 2),
-                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            val activeHour = selectedHour.coerceIn(0, 23)
+            CompactHourBars(points, max, activeHour, { selectedHour = it }, "focus-rhythm-bars")
+            Text("%02d:00 - %02d:00 · %s".format(activeHour, activeHour + 1, compactDuration(values[activeHour])),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            peakHour?.let {
+                Text("专注最多：%02d:00 - %02d:00 · %s".format(it, it + 1, compactDuration(values[it])),
+                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
             }
         }
     }
@@ -267,9 +297,10 @@ private fun HabitMetric(value: String, label: String, modifier: Modifier, emphas
 
 @Composable
 internal fun StatisticsSection(title: String, subtitle: String? = null, content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
-            Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f))
             subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
         content()
@@ -286,7 +317,7 @@ private fun SmallMetric(label: String, value: String, modifier: Modifier) {
 
 @Composable
 private fun EmptyChart(message: String) {
-    Box(Modifier.fillMaxWidth().height(112.dp)
+    Box(Modifier.fillMaxWidth().height(96.dp)
         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .45f), MaterialTheme.shapes.medium),
         contentAlignment = Alignment.Center) {
         Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)

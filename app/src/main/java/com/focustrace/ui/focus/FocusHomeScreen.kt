@@ -24,6 +24,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.focustrace.ui.components.*
 import kotlinx.coroutines.delay
+import com.focustrace.statistics.isValidFocusSession
 
 @Composable
 fun FocusHomeScreen(viewModel: FocusViewModel, onExit: () -> Unit, onReport: (Long) -> Unit) {
@@ -38,7 +39,7 @@ fun FocusHomeScreen(viewModel: FocusViewModel, onExit: () -> Unit, onReport: (Lo
         if (s != null && s.endTime == null && s.status in listOf(1, 2)) runningSessionId = s.id
         else if (s?.endTime != null && runningSessionId == s.id) {
             runningSessionId = null
-            onReport(s.id)
+            if (isValidFocusSession(s)) onReport(s.id) else onExit()
         }
     }
     BackHandler(onBack = onExit)
@@ -54,10 +55,10 @@ fun FocusHomeScreen(viewModel: FocusViewModel, onExit: () -> Unit, onReport: (Lo
                 if (s.status == 2) Button(onClick = viewModel::resume, enabled = !state.busy) { Text("继续专注") }
                 OutlinedButton(onClick = { confirmEnd = true }, enabled = !state.busy) { Text(if (s.status == 3) "结束休息" else "结束专注") }
             }
-            if (s.endTime != null) OutlinedButton(onClick = { onReport(s.id) }) { Text("查看专注报告") }
+            if (s.endTime != null && isValidFocusSession(s)) OutlinedButton(onClick = { onReport(s.id) }) { Text("查看专注报告") }
             TextButton(onClick = { showDistractions = true }) { Text("分心 ${s.distractionCount} 次 · ${s.distractionSeconds} 秒 · 查看记录") }
         } else if (state.ready) {
-            if (s != null && s.endTime != null) {
+            if (s != null && s.endTime != null && isValidFocusSession(s)) {
                 InfoCard("本轮已结束", "专注记录已保存")
                 Button(onClick = { onReport(s.id) }) { Text("查看专注报告") }
             } else Text("当前没有进行中的计时，请返回待办选择任务开始。")
@@ -72,7 +73,7 @@ fun FocusHomeScreen(viewModel: FocusViewModel, onExit: () -> Unit, onReport: (Lo
         busy = state.busy,
         onDismiss = { dismissedPauseAt = s.anchorWall },
         onResume = viewModel::resume)
-    if (confirmEnd) AlertDialog(onDismissRequest = { confirmEnd = false }, title = { Text("结束本轮？") }, text = { Text("已完成的专注时间会保留。") },
+    if (confirmEnd) AlertDialog(onDismissRequest = { confirmEnd = false }, title = { Text("结束本轮？") }, text = { Text("超过 5 分钟的专注会生成记录。") },
         confirmButton = { TextButton(enabled = !state.busy, onClick = { confirmEnd = false; viewModel.finish() }) { Text("确认结束") } },
         dismissButton = { TextButton(onClick = { confirmEnd = false }) { Text("取消") } })
 }

@@ -6,8 +6,16 @@ import com.focustrace.data.local.entity.*
 import com.focustrace.ui.components.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
+import java.time.LocalDate
+import java.time.ZoneId
+import com.focustrace.statistics.*
 
-data class TodoData(val tasks: List<TaskEntity>, val activeSession: FocusSessionEntity?, val reportId: Long?, val defaultMinutes: Int)
+data class TodoData(val tasks: List<TaskEntity>, val activeSession: FocusSessionEntity?, val reportId: Long?,
+    val defaultMinutes: Int, val todayFocusSeconds: Long, val todayTaskSessions: Map<Long, Int>)
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class TodoViewModel(private val container: com.focustrace.data.AppContainer) : ViewModel() {
     private val repository = container.taskRepository
     fun start(taskId: Long, onStarted: () -> Unit) {
@@ -31,6 +39,7 @@ class TodoViewModel(private val container: com.focustrace.data.AppContainer) : V
                 if (task.timerType == 1) container.pomodoro.startStopwatch(task.id)
                 else container.pomodoro.start(task.id, task.targetMinutes * 60L,
                     settings.breakMinutes * 60L, settings.autoStartBreak, settings.autoStartFocus)
+                container.startTimerNotification()
                 onStarted()
             } catch (e: kotlinx.coroutines.CancellationException) { throw e }
             catch (e: Exception) { _error.value = "无法开始专注，请重试；当前计时会保留。" }
@@ -38,8 +47,20 @@ class TodoViewModel(private val container: com.focustrace.data.AppContainer) : V
         }
     }
 
-    val uiState = combine(repository.allTasks, container.database.focusSessionDao().observeLatest(), container.settingsRepository.settings) { tasks, session, settings ->
-        TodoData(tasks, session?.takeIf { it.status in listOf(1, 2, 3) }, session?.takeIf { it.endTime != null }?.id, settings.pomodoroMinutes)
+    private val todayRange = flow {
+        while (currentCoroutineContext().isActive) {
+            val zone = ZoneId.systemDefault()
+            emit(statisticsRange(LocalDate.now(zone), StatisticsPeriod.DAY, zone))
+            delay(60_000)
+        }
+    }.distinctUntilChanged()
+    private val todayStatistics = todayRange.flatMapLatest(container.statisticsRepository::statistics)
+    val uiState = combine(repository.allTasks, container.database.focusSessionDao().observeLatest(),
+        container.database.focusSessionDao().observeLatestValidReportId(), container.settingsRepository.settings,
+        todayStatistics) { tasks, session, reportId, settings, statistics ->
+        TodoData(tasks, session?.takeIf { it.status in listOf(1, 2, 3) }, reportId, settings.pomodoroMinutes,
+            statistics.totals.focusSeconds,
+            statistics.taskDistribution.mapNotNull { item -> item.taskId?.let { it to item.sessions } }.toMap())
     }
         .asLoadState().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LoadState.Loading)
     private val _busy = MutableStateFlow(false)

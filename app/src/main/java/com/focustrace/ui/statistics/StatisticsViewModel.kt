@@ -16,8 +16,17 @@ class StatisticsViewModel(repository: StatisticsRepository,
     private val focusRepository: com.focustrace.data.repository.FocusRepository,
     taskRepository: com.focustrace.data.repository.TaskRepository,
     private val savedState: SavedStateHandle = SavedStateHandle()) : ViewModel() {
+    val selectedTaskId = savedState.getStateFlow<Long?>("statisticsTaskId", null)
     val tasks = taskRepository.allTasks.asLoadState()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), LoadState.Loading)
+    init {
+        viewModelScope.launch {
+            taskRepository.allTasks.collect { currentTasks ->
+                val selected = selectedTaskId.value
+                if (selected != null && currentTasks.none { it.id == selected }) selectTask(null)
+            }
+        }
+    }
     val saving = MutableStateFlow(false)
     val editError = MutableStateFlow<String?>(null)
     fun clearEditError() { editError.value = null }
@@ -51,27 +60,30 @@ class StatisticsViewModel(repository: StatisticsRepository,
     }
     val selection = combine(period, anchor, calendar) { p, a, c -> selection(p, a, c.first, c.second) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), selection(period.value, anchor.value, LocalDate.now(), ZoneId.systemDefault()))
-    val uiState = combine(selection, reload) { selected, _ -> selected }.flatMapLatest { selected ->
-        repository.dashboard(selected.range, selected.period).asLoadState().onStart { emit(LoadState.Loading) }
+    val uiState = combine(selection, selectedTaskId, reload) { selected, taskId, _ -> selected to taskId }
+        .flatMapLatest { (selected, taskId) ->
+        repository.dashboard(selected.range, selected.period, taskId).asLoadState().onStart { emit(LoadState.Loading) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), LoadState.Loading)
-    val habits = combine(calendar, reload) { current, _ -> current }.flatMapLatest { (today, zone) ->
-        repository.habits(today, zone).asLoadState().onStart { emit(LoadState.Loading) }
+    val habits = combine(calendar, selectedTaskId, reload) { current, taskId, _ -> current to taskId }
+        .flatMapLatest { (current, taskId) ->
+        repository.habits(current.first, current.second, taskId).asLoadState().onStart { emit(LoadState.Loading) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), LoadState.Loading)
-    val heatmap = combine(selection, reload) { selected, attempt ->
+    val heatmap = combine(selection, selectedTaskId, reload) { selected, taskId, attempt ->
         val today = LocalDate.now(selected.range.zone)
         val monthAnchor = if (selected.period == StatisticsPeriod.YEAR) {
             if (selected.range.start.year == today.year) today.withDayOfMonth(1)
             else selected.range.endExclusive.minusMonths(1).withDayOfMonth(1)
         } else selected.range.start
-        statisticsRange(monthAnchor, StatisticsPeriod.MONTH, selected.range.zone) to attempt
-    }.distinctUntilChanged().flatMapLatest { (range, _) ->
-        repository.statistics(range).asLoadState().onStart { emit(LoadState.Loading) }
+        Triple(statisticsRange(monthAnchor, StatisticsPeriod.MONTH, selected.range.zone), taskId, attempt)
+    }.distinctUntilChanged().flatMapLatest { (range, taskId, _) ->
+        repository.statistics(range, taskId).asLoadState().onStart { emit(LoadState.Loading) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), LoadState.Loading)
     fun viewDay(date: LocalDate) {
         savedState["statisticsAnchor"] = date.toEpochDay()
         savedState["statisticsPeriod"] = StatisticsPeriod.DAY.name
     }
     fun choose(period: StatisticsPeriod) { savedState["statisticsAnchor"] = null; savedState["statisticsPeriod"] = period.name }
+    fun selectTask(taskId: Long?) { savedState["statisticsTaskId"] = taskId }
     fun selectDate(date: LocalDate) {
         if (date <= LocalDate.now()) savedState["statisticsAnchor"] = date.toEpochDay()
     }

@@ -21,9 +21,10 @@ class ManualRecordTest {
 
     @Test fun validatesTimesAndCalculatesTwoHours() {
         assertEquals("16:00", manualEndTime("14:00", "120"))
-        listOf("0", "-1", "1440", "99999999999999999999", "abc").forEach {
+        listOf("0", "1", "5", "-1", "1440", "99999999999999999999", "abc").forEach {
             assertTrue(runCatching { manualEndTime("14:00", it) }.isFailure)
         }
+        assertEquals("14:06", manualEndTime("14:00", "6"))
         assertTrue(runCatching { manualEndTime("23:00", "60") }.isFailure)
         assertEquals("23:59", manualEndTime("23:00", "59"))
         assertEquals(7200L, parseManualFocusInput("2024-06-12", "14:00", "16:00").seconds)
@@ -31,6 +32,7 @@ class ManualRecordTest {
             assertTrue(runCatching { parseManualFocusInput("2024-06-12", start, end) }.isFailure)
         }
         assertTrue(runCatching { parseManualFocusInput("2024-02-30", "14:00", "16:00") }.isFailure)
+        assertTrue(runCatching { parseManualFocusInput("2024-06-12", "14:00", "14:05") }.isFailure)
     }
 
     @Test fun manualCrudUpdatesAllStatisticsWithoutReplacingActiveTimer() = runBlocking {

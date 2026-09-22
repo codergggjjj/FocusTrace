@@ -1,7 +1,9 @@
 package com.focustrace.statistics
 
 import com.focustrace.data.local.entity.StatisticsRecord
+import java.math.BigInteger
 import java.time.*
+import java.time.temporal.ChronoUnit
 import java.time.temporal.TemporalAdjusters
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
@@ -55,8 +57,65 @@ data class StatisticsDashboard(val current: StatisticsSummary, val previous: Sta
 
 data class HabitStatistics(val currentStreak: Int, val longestStreak: Int, val focusedDaysInMonth: Int, val monthDaysSoFar: Int)
 
-fun summarizeHabits(sessions: List<com.focustrace.data.local.entity.FocusSessionEntity>, today: LocalDate, zone: ZoneId): HabitStatistics {
-    val focusedDays = sessions.asSequence().filter(::isValidFocusSession)
+/**
+ * Splits each session's effective focus time across every local clock hour touched by
+ * its [startTime, endTime) interval. Timer sessions may include pauses or distractions,
+ * so their effective seconds are distributed in proportion to wall-clock overlap. The
+ * integer remainder is assigned to the largest fractional overlaps to keep the sum exact.
+ */
+private fun hourlyFocusSeconds(records: List<StatisticsRecord>, zone: ZoneId): LongArray {
+    val result = LongArray(24)
+    records.forEach { row ->
+        val session = row.session
+        val endMillis = session.endTime ?: return@forEach
+        val focusSeconds = session.focusSeconds.coerceAtLeast(0)
+        if (focusSeconds == 0L || endMillis <= session.startTime) return@forEach
+
+        val overlapMillis = LongArray(24)
+        var cursor = Instant.ofEpochMilli(session.startTime)
+        val end = Instant.ofEpochMilli(endMillis)
+        while (cursor < end) {
+            val localCursor = cursor.atZone(zone)
+            val nextHour = localCursor.truncatedTo(ChronoUnit.HOURS).plusHours(1).toInstant()
+            val segmentEnd = minOf(end, nextHour)
+            val segmentMillis = Duration.between(cursor, segmentEnd).toMillis().coerceAtLeast(0)
+            overlapMillis[localCursor.hour] += segmentMillis
+            if (segmentEnd <= cursor) break
+            cursor = segmentEnd
+        }
+
+        val wallMillis = overlapMillis.sum()
+        if (wallMillis <= 0L) return@forEach
+        val divisor = BigInteger.valueOf(wallMillis)
+        val target = BigInteger.valueOf(focusSeconds)
+        val remainders = mutableListOf<Pair<Int, BigInteger>>()
+        var allocated = 0L
+        overlapMillis.forEachIndexed { hour, millis ->
+            if (millis <= 0L) return@forEachIndexed
+            val quotientAndRemainder = BigInteger.valueOf(millis).multiply(target).divideAndRemainder(divisor)
+            val seconds = quotientAndRemainder[0].toLong()
+            result[hour] += seconds
+            allocated += seconds
+            remainders += hour to quotientAndRemainder[1]
+        }
+        var remainderSeconds = focusSeconds - allocated
+        val remainderOrder = remainders.sortedWith(
+            compareByDescending<Pair<Int, BigInteger>> { it.second }.thenBy { it.first }
+        )
+        var index = 0
+        while (remainderSeconds > 0 && remainderOrder.isNotEmpty()) {
+            val hour = remainderOrder[index % remainderOrder.size].first
+            result[hour] = result[hour] + 1
+            remainderSeconds -= 1
+            index += 1
+        }
+    }
+    return result
+}
+
+fun summarizeHabits(sessions: List<com.focustrace.data.local.entity.FocusSessionEntity>, today: LocalDate, zone: ZoneId,
+    taskId: Long? = null): HabitStatistics {
+    val focusedDays = sessions.asSequence().filter { taskId == null || it.taskId == taskId }.filter(::isValidFocusSession)
         .filter { it.endTime != null && it.status in listOf(3, 4) }
         .map { Instant.ofEpochMilli(it.startTime).atZone(zone).toLocalDate() }
         .filter { it <= today }.toSortedSet()
@@ -88,10 +147,11 @@ fun summarizeHabits(sessions: List<com.focustrace.data.local.entity.FocusSession
     )
 }
 
-fun summarizeStatistics(records: List<StatisticsRecord>, range: StatisticsRange): StatisticsSummary {
+fun summarizeStatistics(records: List<StatisticsRecord>, range: StatisticsRange, taskId: Long? = null): StatisticsSummary {
     val startMillis = range.startMillis
     val endMillis = range.endMillis
-    val eligible = records.filter { it.session.endTime != null && it.session.status in listOf(3, 4) && it.session.startTime >= startMillis && it.session.startTime < endMillis }
+    val eligible = records.filter { (taskId == null || it.session.taskId == taskId) && it.session.endTime != null &&
+        it.session.status in listOf(3, 4) && it.session.startTime >= startMillis && it.session.startTime < endMillis }
     val valid = eligible.filter { isValidFocusSession(it.session) }
     fun totals(rows: List<StatisticsRecord>): StatisticsTotals {
         val focus = rows.sumOf { it.session.focusSeconds.coerceAtLeast(0) }
@@ -110,8 +170,17 @@ fun summarizeStatistics(records: List<StatisticsRecord>, range: StatisticsRange)
     val byDay = valid.groupBy { Instant.ofEpochMilli(it.session.startTime).atZone(range.zone).toLocalDate() }
     val days = generateSequence(range.start) { it.plusDays(1) }.takeWhile { it < range.endExclusive }
         .map { DailyStatistics(it, totals(byDay[it].orEmpty())) }.toList()
-    val byHour = valid.groupBy { Instant.ofEpochMilli(it.session.startTime).atZone(range.zone).hour }
-    val hours = (0..23).map { totals(byHour[it].orEmpty()) }
+    val byStartHour = valid.groupBy { Instant.ofEpochMilli(it.session.startTime).atZone(range.zone).hour }
+    val focusByHour = hourlyFocusSeconds(valid, range.zone)
+    val hours = (0..23).map { hour ->
+        val startHourTotals = totals(byStartHour[hour].orEmpty())
+        val focus = focusByHour[hour]
+        val denominator = focus.toDouble() + startHourTotals.distractionSeconds.toDouble()
+        startHourTotals.copy(
+            focusSeconds = focus,
+            focusPercent = if (denominator == 0.0) null else (100 * focus / denominator).roundToInt()
+        )
+    }
     val taskDistribution = valid.groupBy {
         it.session.taskId?.let { id -> "task:$id" } ?: "title:${it.session.taskTitleSnapshot ?: "自由专注"}"
     }.map { (_, rows) ->
@@ -121,6 +190,6 @@ fun summarizeStatistics(records: List<StatisticsRecord>, range: StatisticsRange)
     }
         .sortedWith(compareByDescending<TaskFocusDistribution> { it.focusSeconds }.thenBy { it.title })
     return StatisticsSummary(range, totals(valid), days,
-        eligible.map { it.session }.sortedWith(compareByDescending<com.focustrace.data.local.entity.FocusSessionEntity> { it.startTime }.thenByDescending { it.id }),
+        valid.map { it.session }.sortedWith(compareByDescending<com.focustrace.data.local.entity.FocusSessionEntity> { it.startTime }.thenByDescending { it.id }),
         hours, taskDistribution)
 }

@@ -10,6 +10,8 @@ interface FocusSessionDao {
     suspend fun latest(): FocusSessionEntity?
     @Query("SELECT * FROM focus_sessions WHERE source = 'TIMER' ORDER BY id DESC LIMIT 1")
     fun observeLatest(): Flow<FocusSessionEntity?>
+    @Query("SELECT id FROM focus_sessions WHERE source = 'TIMER' AND endTime IS NOT NULL AND status IN (3, 4) AND focusSeconds > 300 ORDER BY id DESC LIMIT 1")
+    fun observeLatestValidReportId(): Flow<Long?>
     @Query("SELECT title FROM tasks WHERE id = :id")
     suspend fun taskTitle(id: Long): String?
     @Query("UPDATE focus_sessions SET startTime = :start, endTime = :end, focusSeconds = :seconds, elapsedMillis = :millis, taskId = :taskId, taskTitleSnapshot = :title, note = :note WHERE id = :id AND source = 'MANUAL' AND status = 4")
@@ -22,7 +24,7 @@ interface FocusSessionDao {
     @Query("SELECT * FROM focus_sessions WHERE id = :id")
     fun observeReport(id: Long): Flow<com.focustrace.data.local.entity.SessionWithDistractions?>
     @Transaction
-    @Query("SELECT * FROM focus_sessions WHERE startTime >= :start AND startTime < :end AND endTime IS NOT NULL AND status IN (3, 4) ORDER BY startTime, id")
+    @Query("SELECT * FROM focus_sessions WHERE startTime >= :start AND startTime < :end AND endTime IS NOT NULL AND status IN (3, 4) AND focusSeconds > 300 ORDER BY startTime, id")
     fun observeStatistics(start: Long, end: Long): Flow<List<com.focustrace.data.local.entity.StatisticsRecord>>
     @Query("SELECT * FROM focus_sessions WHERE endTime IS NOT NULL AND status IN (3, 4) AND focusSeconds > 300 ORDER BY startTime")
     fun observeValidSessions(): Flow<List<FocusSessionEntity>>

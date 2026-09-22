@@ -11,7 +11,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.focustrace.focus.FocusReport
 import com.focustrace.focus.formatDuration
-import com.focustrace.statistics.isValidFocusSession
 import com.focustrace.ui.components.*
 import java.time.Instant
 import java.time.ZoneId
@@ -63,9 +62,6 @@ private fun ReportContent(report: FocusReport, modifier: Modifier) {
                     Text(formatDuration(s.focusSeconds), style = MaterialTheme.typography.displaySmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer)
                     if (s.type == 0) Text("计划 ${formatDuration(s.plannedSeconds)}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer)
-                    if (!isValidFocusSession(s)) Text("未计入统计",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer)
                 }

@@ -21,6 +21,7 @@ fun SettingsEditor(original: UserSettings, busy: Boolean, error: String?, onDism
     var threshold by rememberSaveable { mutableStateOf(original.distractionThreshold.toString()) }
     var autoBreak by rememberSaveable { mutableStateOf(original.autoStartBreak) }
     var autoFocus by rememberSaveable { mutableStateOf(original.autoStartFocus) }
+    var sound by rememberSaveable { mutableStateOf(original.soundEnabled) }
     var theme by rememberSaveable { mutableStateOf(original.darkMode.name) }
     val valid = focus.toIntOrNull() in 1..1440 && rest.toIntOrNull() in 1..1440 && threshold.toIntOrNull() in 0..86400
     AlertDialog(onDismissRequest = { if (!busy) onDismiss() }, title = { Text("编辑设置") },
@@ -32,6 +33,7 @@ fun SettingsEditor(original: UserSettings, busy: Boolean, error: String?, onDism
                 NumberSetting("分心阈值秒数", threshold, 0..86400, busy) { threshold = it }
                 ToggleSetting("自动开始休息", autoBreak, busy) { autoBreak = it }
                 ToggleSetting("自动开始下一轮", autoFocus, busy) { autoFocus = it }
+                ToggleSetting("完成提示音", sound, busy) { sound = it }
                 Text("外观", style = MaterialTheme.typography.titleMedium)
                 ThemeMode.entries.forEach { mode ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -45,7 +47,8 @@ fun SettingsEditor(original: UserSettings, busy: Boolean, error: String?, onDism
         },
         confirmButton = { Button(enabled = valid && !busy, onClick = {
             onSave(original.copy(pomodoroMinutes = focus.toInt(), breakMinutes = rest.toInt(),
-                distractionThreshold = threshold.toInt(), autoStartBreak = autoBreak, autoStartFocus = autoFocus, darkMode = ThemeMode.valueOf(theme)))
+                distractionThreshold = threshold.toInt(), autoStartBreak = autoBreak, autoStartFocus = autoFocus,
+                soundEnabled = sound, darkMode = ThemeMode.valueOf(theme)))
         }) { Text(if (busy) "保存中…" else "保存设置") } },
         dismissButton = { TextButton(enabled = !busy, onClick = onDismiss) { Text("取消") } })
 }

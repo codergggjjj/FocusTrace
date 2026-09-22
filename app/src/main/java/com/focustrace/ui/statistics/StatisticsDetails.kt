@@ -40,9 +40,6 @@ internal fun StudyRecordsDialog(state: LoadState<StatisticsSummary>, onDismiss: 
                             if (session.source == "MANUAL") Text("手动添加", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                             Text(session.taskTitleSnapshot ?: "自由专注 / 原待办不可用", style = MaterialTheme.typography.titleMedium)
                             Text(compactDuration(session.focusSeconds), color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
-                            if (!isValidFocusSession(session)) Text("不足 5 分钟 · 未计入统计",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                style = MaterialTheme.typography.bodySmall)
                             Text("开始：${formatter.format(Instant.ofEpochMilli(session.startTime))}", style = MaterialTheme.typography.bodySmall)
                             Text("结束：${formatter.format(Instant.ofEpochMilli(session.endTime!!))}", style = MaterialTheme.typography.bodySmall)
                             session.note?.let { Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) }

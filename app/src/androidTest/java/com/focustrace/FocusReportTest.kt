@@ -60,8 +60,8 @@ class FocusReportTest {
             val repository = FocusRepository(db.focusSessionDao(), db.distractionDao())
             engine.startStopwatch(id)
             val sessionId = engine.refresh()!!.id
-            assertFalse(repository.reportFor(sessionId).first()!!.available)
-            clock.advance(10000); engine.onBackground(3); clock.advance(5000); engine.onForeground()
+            assertNull(repository.reportFor(sessionId).first())
+            clock.advance(310000); engine.onBackground(3); clock.advance(5000); engine.onForeground()
             engine.finish()
             db.taskDao().update(task.copy(id = id, title = "改名后"))
             db.taskDao().delete(task.copy(id = id))
@@ -69,10 +69,23 @@ class FocusReportTest {
             val report = repository.reportFor(sessionId).first()!!
             assertEquals("报告标题", report.title)
             assertNull(report.session.taskId)
-            assertEquals(10L, report.session.focusSeconds)
+            assertEquals(310L, report.session.focusSeconds)
             assertEquals(5L, report.distractionSeconds)
-            assertEquals(67, report.focusPercent)
+            assertEquals(98, report.focusPercent)
             assertNull(repository.reportFor(Long.MAX_VALUE).first())
+        } finally { db.close() }
+    }
+    @Test fun fiveMinutesOrLessDoesNotProduceVisibleReport() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), FocusTraceDatabase::class.java).build()
+        try {
+            val clock = PomodoroTest.Clock()
+            val engine = PomodoroEngine(db, clock)
+            val repository = FocusRepository(db.focusSessionDao(), db.distractionDao())
+            engine.startStopwatch(null)
+            val sessionId = engine.refresh()!!.id
+            clock.advance(300000)
+            engine.finish()
+            assertNull(repository.reportFor(sessionId).first())
         } finally { db.close() }
     }
     @Test fun migrationBackfillsExistingTaskTitle() {

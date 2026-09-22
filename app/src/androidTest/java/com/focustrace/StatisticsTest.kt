@@ -20,20 +20,48 @@ class StatisticsTest {
     private fun row(id: Long, focus: Long, duration: Long = 0): StatisticsRecord {
         val start = date.atStartOfDay(zone).toInstant().toEpochMilli()
         return StatisticsRecord(FocusSessionEntity(id = id, type = 0, startTime = start,
-            endTime = start + 86400001, plannedSeconds = 100, focusSeconds = focus, status = 4),
+            endTime = start + focus.coerceAtLeast(1) * 1000, plannedSeconds = 100, focusSeconds = focus, status = 4),
             if (duration == 0L) emptyList() else listOf(DistractionEventEntity(id, id, start + 10000, start + 10000 + duration * 1000, duration)))
     }
 
-    @Test fun hourlyChartUsesStartHourAndKeepsEffectiveTotals() {
-        val source = row(1, 3600, 20)
-        val start = date.atTime(22, 30).atZone(zone).toInstant().toEpochMilli()
-        val session = source.copy(session = source.session.copy(startTime = start, endTime = start + 7200000))
+    @Test fun hourlyChartSplitsTimerSessionByActualHourOverlap() {
+        val source = row(1, 6600, 20)
+        val start = date.atTime(13, 0).atZone(zone).toInstant().toEpochMilli()
+        val session = source.copy(session = source.session.copy(startTime = start,
+            endTime = date.atTime(14, 50).atZone(zone).toInstant().toEpochMilli()))
         val result = summarizeStatistics(listOf(session), statisticsRange(date, StatisticsPeriod.DAY, zone))
         assertEquals(24, result.hours.size)
-        assertEquals(3600L, result.hours[22].focusSeconds)
-        assertEquals(20L, result.hours[22].distractionSeconds)
+        assertEquals(3600L, result.hours[13].focusSeconds)
+        assertEquals(3000L, result.hours[14].focusSeconds)
+        assertEquals(20L, result.hours[13].distractionSeconds)
         assertEquals(result.totals.focusSeconds, result.hours.sumOf { it.focusSeconds })
-        assertEquals(0L, result.hours[23].focusSeconds)
+    }
+
+    @Test fun hourlyChartSplitsManualSessionAcrossEveryCoveredHour() {
+        val start = date.atTime(13, 30).atZone(zone).toInstant().toEpochMilli()
+        val manual = row(2, 6000).copy(session = row(2, 6000).session.copy(
+            startTime = start,
+            endTime = date.atTime(15, 10).atZone(zone).toInstant().toEpochMilli(),
+            type = 1,
+            source = "MANUAL"
+        ))
+        val result = summarizeStatistics(listOf(manual), statisticsRange(date, StatisticsPeriod.DAY, zone))
+        assertEquals(1800L, result.hours[13].focusSeconds)
+        assertEquals(3600L, result.hours[14].focusSeconds)
+        assertEquals(600L, result.hours[15].focusSeconds)
+        assertEquals(6000L, result.hours.sumOf { it.focusSeconds })
+    }
+
+    @Test fun hourlyChartKeepsEffectiveTotalWhenWallTimeIncludesPauses() {
+        val start = date.atTime(13, 0).atZone(zone).toInstant().toEpochMilli()
+        val timer = row(3, 3600).copy(session = row(3, 3600).session.copy(
+            startTime = start,
+            endTime = date.atTime(15, 0).atZone(zone).toInstant().toEpochMilli()
+        ))
+        val result = summarizeStatistics(listOf(timer), statisticsRange(date, StatisticsPeriod.DAY, zone))
+        assertEquals(1800L, result.hours[13].focusSeconds)
+        assertEquals(1800L, result.hours[14].focusSeconds)
+        assertEquals(3600L, result.hours.sumOf { it.focusSeconds })
     }
 
     @Test fun heatmapThresholdsAreStable() {
@@ -73,7 +101,7 @@ class StatisticsTest {
         assertEquals(10L, result.totals.averageFirstDistractionSeconds)
         assertEquals(0L, result.days.first().totals.focusSeconds)
         assertEquals(1201L, result.days.last().totals.focusSeconds)
-        assertTrue(result.sessions.any { it.id == fiveMinutes.session.id })
+        assertFalse(result.sessions.any { it.id == fiveMinutes.session.id })
         assertEquals(0, summarizeStatistics(listOf(a), statisticsRange(date.plusDays(1), StatisticsPeriod.DAY, zone)).totals.sessions)
         assertNull(summarizeStatistics(emptyList(), range).totals.focusPercent)
     }
@@ -97,6 +125,28 @@ class StatisticsTest {
         assertEquals(2, habits.currentStreak)
         assertEquals(2, habits.longestStreak)
         assertEquals(2, habits.focusedDaysInMonth)
+    }
+
+    @Test fun taskFilterScopesTotalsChartsRecordsAndHabitsTogether() {
+        val firstStart = date.atTime(9, 0).atZone(zone).toInstant().toEpochMilli()
+        val first = row(10, 1800).copy(session = row(10, 1800).session.copy(taskId = 7,
+            taskTitleSnapshot = "算法", startTime = firstStart, endTime = firstStart + 1_800_000))
+        val secondStart = date.atTime(14, 0).atZone(zone).toInstant().toEpochMilli()
+        val second = row(11, 3600).copy(session = row(11, 3600).session.copy(taskId = 8,
+            taskTitleSnapshot = "英语", startTime = secondStart, endTime = secondStart + 3_600_000))
+        val range = statisticsRange(date, StatisticsPeriod.DAY, zone)
+
+        val filtered = summarizeStatistics(listOf(first, second), range, taskId = 7)
+        assertEquals(1800L, filtered.totals.focusSeconds)
+        assertEquals(1, filtered.totals.sessions)
+        assertEquals(listOf("算法"), filtered.taskDistribution.map { it.title })
+        assertEquals(listOf(10L), filtered.sessions.map { it.id })
+        assertEquals(1800L, filtered.hours[9].focusSeconds)
+        assertEquals(0L, filtered.hours[14].focusSeconds)
+
+        val habits = summarizeHabits(listOf(first.session, second.session), date, zone, taskId = 7)
+        assertEquals(1, habits.currentStreak)
+        assertEquals(1, habits.focusedDaysInMonth)
     }
 
     @Test fun roomStatisticsObserveUpdatedRecords() = runBlocking {
