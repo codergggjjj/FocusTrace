@@ -1,5 +1,7 @@
 package com.focustrace.ui.settings
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -23,11 +25,19 @@ import com.focustrace.ui.components.*
 fun ProfileScreen(viewModel: SettingsViewModel) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var editing by rememberSaveable { mutableStateOf(false) }
+    var editingBackground by rememberSaveable { mutableStateOf(false) }
     val busy by viewModel.busy.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
     val loaded = (state as? LoadState.Ready)?.value
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) viewModel.importBackground(uri)
+    }
     if (editing && loaded != null) SettingsEditor(loaded, busy, error,
         onDismiss = { editing = false }, onSave = { value -> viewModel.save(value) { editing = false } })
+    if (editingBackground && loaded != null) FocusBackgroundEditor(loaded, busy, error,
+        onChange = { viewModel.save(it) {} },
+        onChooseImage = { imagePicker.launch("image/*") },
+        onDismiss = { editingBackground = false })
     BasePage("我的", "找到适合自己的专注节奏") {
         StateContent(state) { settings ->
             Column {
@@ -60,6 +70,13 @@ fun ProfileScreen(viewModel: SettingsViewModel) {
                 SettingRow(Icons.Outlined.Palette, "主题", when (settings.darkMode) {
                     ThemeMode.SYSTEM -> "跟随系统"; ThemeMode.LIGHT -> "浅色"; ThemeMode.DARK -> "深色"
                 }, !busy) { editing = true }
+                SettingsDivider()
+                SettingRow(Icons.Outlined.Image, "专注背景", when {
+                    !settings.focusBackgroundEnabled -> "已关闭"
+                    settings.focusBackgroundCustomPath != null -> "自定义图片"
+                    settings.focusBackgroundRandom -> "随机显示内置图片"
+                    else -> "固定内置图片"
+                }, !busy) { editingBackground = true }
             }
             if (!editing) error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         }

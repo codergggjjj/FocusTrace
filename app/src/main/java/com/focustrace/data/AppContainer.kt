@@ -13,7 +13,7 @@ class AppContainer(context: Context) {
     val taskRepository = TaskRepository(database.taskDao())
     val focusRepository = FocusRepository(database.focusSessionDao(), database.distractionDao())
     val statisticsRepository = StatisticsRepository(database.focusSessionDao())
-    val settingsRepository = SettingsRepository(SettingsDataStore(context))
+    val settingsRepository = SettingsRepository(SettingsDataStore(context), FocusBackgroundImageStore(applicationContext))
     val lifecycle = com.focustrace.lifecycle.FocusLifecycleCoordinator(pomodoro, settingsRepository, clock)
     fun startTimerNotification() = com.focustrace.notification.FocusTimerService.start(applicationContext)
 }

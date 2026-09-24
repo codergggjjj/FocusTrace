@@ -2,6 +2,7 @@ package com.focustrace.ui.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.net.Uri
 import com.focustrace.data.repository.SettingsRepository
 import com.focustrace.data.datastore.UserSettings
 import com.focustrace.ui.components.*
@@ -23,6 +24,17 @@ class SettingsViewModel(private val repository: SettingsRepository) : ViewModel(
             try { repository.update(value); done() }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { _error.value = "保存失败，请重试。" }
+            finally { _busy.value = false }
+        }
+    }
+    fun importBackground(uri: Uri) {
+        if (_busy.value) return
+        _busy.value = true
+        _error.value = null
+        viewModelScope.launch {
+            try { repository.importBackground(uri) }
+            catch (e: CancellationException) { throw e }
+            catch (e: Exception) { _error.value = "图片导入失败，请选择其他图片重试。" }
             finally { _busy.value = false }
         }
     }

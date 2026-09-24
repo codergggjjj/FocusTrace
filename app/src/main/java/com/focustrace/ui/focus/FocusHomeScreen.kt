@@ -1,6 +1,8 @@
 package com.focustrace.ui.focus
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.activity.compose.BackHandler
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.PauseCircleOutline
@@ -10,12 +12,14 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.input.KeyboardType
@@ -43,27 +47,68 @@ fun FocusHomeScreen(viewModel: FocusViewModel, onExit: () -> Unit, onReport: (Lo
         }
     }
     BackHandler(onBack = onExit)
-    BasePage("专注", "一次只做一件事") {
+    val active = state.ready && s?.status in listOf(1, 2, 3)
+    if (active && s != null) {
+        val immersive = state.backgroundId != null
+        val foreground = if (immersive) Color.White else MaterialTheme.colorScheme.onSurface
+        Box(Modifier.fillMaxSize()) {
+            state.backgroundId?.let { FocusBackground(it, Modifier.fillMaxSize()) }
+            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                TextButton(onClick = onExit, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                    Text("返回待办", color = if (immersive) Color.White else MaterialTheme.colorScheme.primary)
+                }
+                Text("专注", style = MaterialTheme.typography.headlineLarge, color = foreground)
+                Text("一次只做一件事", style = MaterialTheme.typography.bodyMedium,
+                    color = if (immersive) Color.White.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant)
+                state.lifecycleError?.let { Text(it, color = MaterialTheme.colorScheme.errorContainer) }
+                state.error?.let { Text(it, color = MaterialTheme.colorScheme.errorContainer) }
+                LiveTimer(viewModel, s, state.tasks.firstOrNull { it.id == s.taskId }?.title
+                    ?: s.taskTitleSnapshot ?: "自由专注", immersive)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (s.status == 1) Button(onClick = viewModel::pause, enabled = !state.busy,
+                        modifier = Modifier.weight(1f).heightIn(min = 52.dp).testTag("focus-pause")) { Text("暂停") }
+                    if (s.status == 2) Button(onClick = viewModel::resume, enabled = !state.busy,
+                        modifier = Modifier.weight(1f).heightIn(min = 52.dp).testTag("focus-resume")) { Text("继续专注") }
+                    if (s.status == 3) Spacer(Modifier.weight(1f))
+                    OutlinedButton(onClick = { confirmEnd = true }, enabled = !state.busy,
+                        modifier = Modifier.weight(1f).heightIn(min = 52.dp),
+                        colors = if (immersive) ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                            else ButtonDefaults.outlinedButtonColors()) {
+                        Text(if (s.status == 3) "结束休息" else "结束专注")
+                    }
+                }
+                Surface(shape = MaterialTheme.shapes.large,
+                    color = if (immersive) Color.Black.copy(alpha = 0.42f) else MaterialTheme.colorScheme.surface,
+                    modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("本轮分心", style = MaterialTheme.typography.titleSmall, color = foreground)
+                        Text("${s.distractionCount} 次  ·  ${s.distractionSeconds} 秒",
+                            style = MaterialTheme.typography.bodyLarge, color = foreground)
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically) {
+                            TextButton(onClick = { showDistractions = true }, contentPadding = PaddingValues(0.dp)) {
+                                Text("查看记录", color = if (immersive) Color.White else MaterialTheme.colorScheme.primary)
+                            }
+                            TextButton(onClick = { showThreshold = true }, enabled = !state.busy,
+                                contentPadding = PaddingValues(0.dp)) {
+                                Text("分心判定：${state.settings.distractionThreshold} 秒",
+                                    color = if (immersive) Color.White else MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    } else BasePage("专注", "一次只做一件事") {
         TextButton(onClick = onExit) { Text("返回待办") }
         state.lifecycleError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         if (!state.ready) CircularProgressIndicator()
-        else if (s != null && s.status in listOf(1, 2, 3)) {
-            LiveTimer(viewModel, s, state.tasks.firstOrNull { it.id == s.taskId }?.title ?: s.taskTitleSnapshot ?: "自由专注")
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)) {
-                if (s.status == 1) Button(onClick = viewModel::pause, enabled = !state.busy) { Text("暂停") }
-                if (s.status == 2) Button(onClick = viewModel::resume, enabled = !state.busy) { Text("继续专注") }
-                OutlinedButton(onClick = { confirmEnd = true }, enabled = !state.busy) { Text(if (s.status == 3) "结束休息" else "结束专注") }
-            }
-            if (s.endTime != null && isValidFocusSession(s)) OutlinedButton(onClick = { onReport(s.id) }) { Text("查看专注报告") }
-            TextButton(onClick = { showDistractions = true }) { Text("分心 ${s.distractionCount} 次 · ${s.distractionSeconds} 秒 · 查看记录") }
-        } else if (state.ready) {
-            if (s != null && s.endTime != null && isValidFocusSession(s)) {
-                InfoCard("本轮已结束", "专注记录已保存")
-                Button(onClick = { onReport(s.id) }) { Text("查看专注报告") }
-            } else Text("当前没有进行中的计时，请返回待办选择任务开始。")
-        }
-        TextButton(onClick = { showThreshold = true }, enabled = !state.busy) { Text("分心判定：${state.settings.distractionThreshold} 秒") }
+        else if (s != null && s.endTime != null && isValidFocusSession(s)) {
+            InfoCard("本轮已结束", "专注记录已保存")
+            Button(onClick = { onReport(s.id) }) { Text("查看专注报告") }
+        } else Text("当前没有进行中的计时，请返回待办选择任务开始。")
     }
     if (showDistractions) DistractionHistoryDialog(state.distractions) { showDistractions = false }
     if (showThreshold) DistractionThresholdDialog(state.settings.distractionThreshold, onDismiss = { showThreshold = false },
@@ -121,27 +166,41 @@ private fun formatPauseDuration(seconds: Long): String = if (seconds >= 3_600) {
 } else "%02d:%02d".format(seconds / 60, seconds % 60)
 
 @Composable
-private fun LiveTimer(viewModel: FocusViewModel, session: com.focustrace.data.local.entity.FocusSessionEntity, title: String) {
+private fun LiveTimer(viewModel: FocusViewModel, session: com.focustrace.data.local.entity.FocusSessionEntity, title: String, immersive: Boolean) {
     val timer by viewModel.timer.collectAsStateWithLifecycle()
     TimerDisplay(title = title, seconds = if (session.type == 1) timer.elapsedSeconds else timer.remainingSeconds,
         status = when (session.status) { 1 -> "正在专注"; 2 -> "已暂停"; else -> "正在休息" },
         progress = if (session.type == 0) (1f - timer.remainingSeconds.toFloat() /
-            (if (session.status == 3) session.restSeconds else session.plannedSeconds).coerceAtLeast(1)).coerceIn(0f, 1f) else null)
+            (if (session.status == 3) session.restSeconds else session.plannedSeconds).coerceAtLeast(1)).coerceIn(0f, 1f) else null,
+        immersive = immersive)
 }
 
 @Composable
-private fun TimerDisplay(title: String, seconds: Long, status: String, progress: Float?) {
-    TraceCard {
-        Text(title, Modifier.fillMaxWidth(), textAlign = TextAlign.Center, style = MaterialTheme.typography.titleMedium)
-        // The ring is decorative; the timer and status remain readable with large system fonts.
-        Box(Modifier.fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
-            if (progress != null && LocalDensity.current.fontScale <= 1.3f) CircularProgressIndicator(progress = { progress }, modifier = Modifier.size(220.dp),
-                color = MaterialTheme.colorScheme.primary, trackColor = MaterialTheme.colorScheme.primaryContainer, strokeWidth = 4.dp)
-            Column(Modifier.padding(vertical = 60.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("%02d:%02d".format(seconds / 60, seconds % 60),
-                    style = MaterialTheme.typography.displaySmall.copy(fontSize = 40.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Light))
-                Text(status, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(top = 8.dp))
+private fun TimerDisplay(title: String, seconds: Long, status: String, progress: Float?, immersive: Boolean) {
+    val foreground = if (immersive) Color.White else MaterialTheme.colorScheme.onSurface
+    Surface(shape = MaterialTheme.shapes.extraLarge,
+        color = if (immersive) Color.Black.copy(alpha = 0.42f) else MaterialTheme.colorScheme.surface,
+        modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(horizontal = 20.dp, vertical = 24.dp), horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(title, Modifier.fillMaxWidth(), textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold,
+                color = foreground, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Box(Modifier.fillMaxWidth().heightIn(min = 218.dp), contentAlignment = Alignment.Center) {
+                if (progress != null && LocalDensity.current.fontScale <= 1.3f) CircularProgressIndicator(
+                    progress = { progress }, modifier = Modifier.size(210.dp),
+                    color = if (immersive) Color.White else MaterialTheme.colorScheme.primary,
+                    trackColor = if (immersive) Color.White.copy(alpha = 0.28f) else MaterialTheme.colorScheme.primaryContainer,
+                    strokeWidth = 4.dp)
+                Column(horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("%02d:%02d".format(seconds / 60, seconds % 60),
+                        style = MaterialTheme.typography.displaySmall.copy(fontSize = 42.sp,
+                            fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Medium),
+                        color = foreground, maxLines = 1)
+                    Text(status, color = if (immersive) Color.White else MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.titleSmall)
+                }
             }
         }
     }

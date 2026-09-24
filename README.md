@@ -2,7 +2,7 @@
 
 记录每一次专注，也看见每一次分心。
 
-[下载 FocusTrace v1.0.8 APK](https://github.com/codergggjjj/FocusTrace/releases/download/v1.0.8/FocusTrace-v1.0.8-performance.apk) · [发布范围与说明](docs/release-v1.0.8.md)
+[下载 FocusTrace v1.0.9 APK](https://github.com/codergggjjj/FocusTrace/releases/download/v1.0.9/FocusTrace-v1.0.9-performance.apk) · [发布范围与说明](docs/release-v1.0.9.md)
 
 此版本使用 debug 签名，面向 Android 8.0 及以上，按当前已实现功能发布。
 
@@ -80,6 +80,8 @@ docs/                阶段说明与验证结果
 番茄钟支持关联待办或自由专注、自定义专注/休息时长、暂停继续、提前结束、休息倒计时及本轮摘要。时间锚点持久化到 Room，数据库已升级为版本 6，提供 1→2→3→4→5→6 迁移。
 
 正向计时从零开始，不设计划截止时间，支持暂停、恢复与结束保存，不自动进入休息。
+
+专注中的页面可显示沉浸式背景，内置湖畔、森林与海边三张风景插画；“我的 → 专注背景”可关闭背景、选择固定图片、勾选随机图片或导入自己的照片。自定义照片优先于内置图片，复制并缩放到应用私有目录；随机图片每轮选定一次，暂停、返回页面或重建后保持不变。详见 [专注背景说明](docs/focus-background.md)。
 
 专注或休息期间显示常驻通知，可直接暂停、继续和结束；番茄自然完成及休息结束会发送完成提醒。Android 13 及以上首次运行会申请通知权限，提示音可在“我的”中关闭，详见 [通知说明](docs/notifications.md)。
 

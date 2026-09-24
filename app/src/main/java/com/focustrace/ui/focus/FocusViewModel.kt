@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.*
 data class FocusUiState(val ready: Boolean = false, val session: FocusSessionEntity? = null,
     val tasks: List<TaskEntity> = emptyList(), val settings: UserSettings = UserSettings(),
     val distractions: List<DistractionEventEntity> = emptyList(), val lifecycleError: String? = null,
-    val busy: Boolean = false, val error: String? = null)
+    val busy: Boolean = false, val error: String? = null, val backgroundId: String? = null)
 data class TimerUiState(val remainingSeconds: Long = 0, val elapsedSeconds: Long = 0)
 class FocusViewModel(private val container: AppContainer) : ViewModel() {
     private val engine = container.pomodoro
@@ -20,6 +20,28 @@ class FocusViewModel(private val container: AppContainer) : ViewModel() {
     private val _timer = MutableStateFlow(TimerUiState())
     val timer = _timer.asStateFlow()
     init {
+        viewModelScope.launch {
+            uiState.map { state ->
+                Triple(state.session?.id, state.session?.status in listOf(1, 2, 3), state.settings)
+            }.distinctUntilChanged().collectLatest { (id, active, settings) ->
+                val background = try {
+                    when {
+                        !active || id == null || !settings.focusBackgroundEnabled -> null
+                        settings.focusBackgroundCustomPath != null -> settings.focusBackgroundCustomPath
+                        settings.focusBackgroundRandom && settings.focusBackgroundIds.isNotEmpty() ->
+                            container.settingsRepository.imageForSession(id)
+                        !settings.focusBackgroundRandom -> settings.focusBackgroundSelectedId
+                        else -> null
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    _state.update { it.copy(error = "无法加载专注背景") }
+                    null
+                }
+                _state.update { it.copy(backgroundId = background) }
+            }
+        }
         viewModelScope.launch {
             container.lifecycle.error.collect { message -> _state.update { it.copy(lifecycleError = message) } }
         }
