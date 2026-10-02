@@ -32,16 +32,24 @@ fun StatisticsScreen(viewModel: StatisticsViewModel, onReport: (Long) -> Unit) {
     val selection by viewModel.selection.collectAsStateWithLifecycle()
     val heatmap by viewModel.heatmap.collectAsStateWithLifecycle()
     val habits by viewModel.habits.collectAsStateWithLifecycle()
+    val learningGoals by viewModel.learningGoals.collectAsStateWithLifecycle()
+    var editingGoals by rememberSaveable { mutableStateOf(false) }
     var showDate by rememberSaveable { mutableStateOf(false) }
     var showRecords by rememberSaveable { mutableStateOf(false) }
     var showDetails by rememberSaveable { mutableStateOf(false) }
     var showRules by rememberSaveable { mutableStateOf(false) }
     var editorOpen by rememberSaveable { mutableStateOf(false) }
     var editingId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var deletingId by rememberSaveable { mutableStateOf<Long?>(null) }
     val tasks by viewModel.tasks.collectAsStateWithLifecycle()
     val selectedTaskId by viewModel.selectedTaskId.collectAsStateWithLifecycle()
     val busy by viewModel.saving.collectAsStateWithLifecycle()
     val editError by viewModel.editError.collectAsStateWithLifecycle()
+    if (editingGoals) (learningGoals as? LoadState.Ready)?.value?.let { goals ->
+        LearningGoalsEditor(goals.daily.targetMinutes, goals.weekly.targetMinutes, busy, editError,
+            onDismiss = { editingGoals = false },
+            onSave = { daily, weekly -> viewModel.saveLearningGoals(daily, weekly) { editingGoals = false } })
+    }
     val taskList = (tasks as? LoadState.Ready)?.value.orEmpty()
     val listState = rememberLazyListState()
     if (showDate) PeriodDateDialog(selection, onDismiss = { showDate = false }) {
@@ -54,11 +62,16 @@ fun StatisticsScreen(viewModel: StatisticsViewModel, onReport: (Long) -> Unit) {
     }
     if (showRecords) StudyRecordsDialog(summaryState, onDismiss = { showRecords = false }, onRetry = viewModel::retry,
         onAdd = { editingId = null; viewModel.clearEditError(); editorOpen = true },
-        onEdit = { editingId = it; viewModel.clearEditError(); editorOpen = true }) {
+        onEdit = { editingId = it; viewModel.clearEditError(); editorOpen = true },
+        busy = busy, onDelete = { deletingId = it; viewModel.clearEditError() }) {
         showRecords = false; onReport(it)
     }
     val summary = (state as? LoadState.Ready)?.value?.current
     val editedRecord = summary?.sessions?.firstOrNull { it.id == editingId }
+    summary?.sessions?.firstOrNull { it.id == deletingId }?.let { record ->
+        DeleteFocusRecordDialog(record, busy, editError, onDismiss = { deletingId = null },
+            onConfirm = { viewModel.deleteRecord(record.id) { deletingId = null } })
+    }
     if (editorOpen && (editingId == null || editedRecord != null)) ManualRecordDialog(
         editedRecord, tasks, busy, editError, onDismiss = { editorOpen = false },
         onSave = { date, start, end, task, note ->
@@ -72,7 +85,7 @@ fun StatisticsScreen(viewModel: StatisticsViewModel, onReport: (Long) -> Unit) {
         .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = .42f))
         .testTag("statistics-list"), state = listState,
         contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 32.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp)) {
+        verticalArrangement = Arrangement.spacedBy(20.dp)) {
         item(key = "header", contentType = "header") {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
@@ -85,8 +98,8 @@ fun StatisticsScreen(viewModel: StatisticsViewModel, onReport: (Long) -> Unit) {
         item(key = "period", contentType = "period") {
             Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(if (taskList.isEmpty()) "统计范围" else "时间范围 / 待办筛选",
-                        style = MaterialTheme.typography.titleMedium)
+                    Text("统计范围", style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                     SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                         StatisticsPeriod.entries.forEachIndexed { index, period ->
                             SegmentedButton(selected = selection.period == period,
@@ -141,6 +154,15 @@ fun StatisticsScreen(viewModel: StatisticsViewModel, onReport: (Long) -> Unit) {
                 item(key = "overview", contentType = "overview") {
                     StudyOverview(value.value.current, value.value.previous,
                         onRecords = { showRecords = true }, onDetails = { showDetails = true })
+                }
+                item(key = "goals", contentType = "goals") {
+                    when (val goals = learningGoals) {
+                        is LoadState.Ready -> LearningGoalsCard(goals.value) {
+                            viewModel.clearEditError(); editingGoals = true
+                        }
+                        is LoadState.Error -> TextButton(onClick = viewModel::retry) { Text("学习目标加载失败，点击重试") }
+                        LoadState.Loading -> LinearProgressIndicator(Modifier.fillMaxWidth())
+                    }
                 }
                 item(key = "chart", contentType = "chart") { StudyTrend(value.value.current, selection.period) }
                 item(key = "distribution", contentType = "distribution") { TaskDistribution(value.value.current) }

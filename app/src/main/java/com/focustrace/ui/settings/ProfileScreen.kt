@@ -26,18 +26,37 @@ fun ProfileScreen(viewModel: SettingsViewModel) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var editing by rememberSaveable { mutableStateOf(false) }
     var editingBackground by rememberSaveable { mutableStateOf(false) }
+    var showingBackup by rememberSaveable { mutableStateOf(false) }
+    var editingGoals by rememberSaveable { mutableStateOf(false) }
     val busy by viewModel.busy.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
+    val backupPreview by viewModel.backupPreview.collectAsStateWithLifecycle()
+    val backupMessage by viewModel.backupMessage.collectAsStateWithLifecycle()
     val loaded = (state as? LoadState.Ready)?.value
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) viewModel.importBackground(uri)
     }
+    val backupCreator = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
+        if (uri != null) viewModel.exportBackup(uri)
+    }
+    val backupPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) viewModel.inspectBackup(uri)
+    }
     if (editing && loaded != null) SettingsEditor(loaded, busy, error,
         onDismiss = { editing = false }, onSave = { value -> viewModel.save(value) { editing = false } })
+    if (editingGoals && loaded != null) LearningGoalsEditor(loaded.dailyGoalMinutes, loaded.weeklyGoalMinutes, busy, error,
+        onDismiss = { editingGoals = false },
+        onSave = { daily, weekly -> viewModel.saveLearningGoals(daily, weekly) { editingGoals = false } })
     if (editingBackground && loaded != null) FocusBackgroundEditor(loaded, busy, error,
         onChange = { viewModel.save(it) {} },
         onChooseImage = { imagePicker.launch("image/*") },
         onDismiss = { editingBackground = false })
+    if (showingBackup) BackupDialog(backupPreview, busy, backupMessage,
+        onExport = { backupCreator.launch("FocusTrace-backup.zip") },
+        onImport = { backupPicker.launch(arrayOf("application/zip", "application/octet-stream", "*/*")) },
+        onRestore = viewModel::restoreBackup,
+        onCancelImport = viewModel::cancelBackupImport,
+        onDismiss = { showingBackup = false })
     BasePage("我的", "找到适合自己的专注节奏") {
         StateContent(state) { settings ->
             Column {
@@ -50,6 +69,14 @@ fun ProfileScreen(viewModel: SettingsViewModel) {
                 SettingRow(Icons.Outlined.Coffee, "休息时长", "${settings.breakMinutes} 分钟", !busy) { editing = true }
                 SettingsDivider()
                 SettingRow(Icons.Outlined.NotificationsNone, "分心判定", "${settings.distractionThreshold} 秒", !busy) { editing = true }
+            }
+            Column {
+                SettingsSection("学习计划")
+                val daily = if (settings.dailyGoalMinutes > 0) learningGoalDuration(settings.dailyGoalMinutes * 60L) else "未开启"
+                val weekly = if (settings.weeklyGoalMinutes > 0) learningGoalDuration(settings.weeklyGoalMinutes * 60L) else "未开启"
+                SettingRow(Icons.Outlined.Flag, "学习目标", "每日 $daily · 每周 $weekly", !busy) {
+                    viewModel.clearError(); editingGoals = true
+                }
             }
             Column {
                 SettingsSection("自动化")
@@ -77,6 +104,12 @@ fun ProfileScreen(viewModel: SettingsViewModel) {
                     settings.focusBackgroundRandom -> "随机显示内置图片"
                     else -> "固定内置图片"
                 }, !busy) { editingBackground = true }
+            }
+            Column {
+                SettingsSection("数据")
+                SettingRow(Icons.Outlined.FolderOpen, "备份与恢复", "导出或恢复本机记录", !busy) {
+                    showingBackup = true
+                }
             }
             if (!editing) error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         }

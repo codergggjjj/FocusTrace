@@ -31,7 +31,7 @@ class MainActivity : ComponentActivity() {
         val container = (application as FocusTraceApplication).container
         setContent {
             val settingsViewModel: SettingsViewModel = viewModel(factory = viewModelFactory {
-                initializer { SettingsViewModel(container.settingsRepository) }
+                initializer { SettingsViewModel(container.settingsRepository, container.backupRepository) }
             })
             val settings by settingsViewModel.uiState.collectAsStateWithLifecycle()
             val mode = (settings as? LoadState.Ready)?.value?.darkMode ?: ThemeMode.SYSTEM

@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.first
 class SettingsRepository(private val store: SettingsDataStore, private val images: FocusBackgroundImageStore) {
     val settings = store.settings
     suspend fun setDistractionThreshold(seconds: Int) = store.setDistractionThreshold(seconds)
+    suspend fun setLearningGoals(daily: Int, weekly: Int) = store.setLearningGoals(daily, weekly)
     suspend fun update(settings: UserSettings) {
         val previous = store.settings.first().focusBackgroundCustomPath
         store.update(settings)

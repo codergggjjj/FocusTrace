@@ -9,6 +9,29 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 class FocusBackgroundImageStore(private val context: Context) {
+    private fun ownedFile(path: String?): File? {
+        if (path == null) return null
+        val file = File(path)
+        return file.takeIf { it.parentFile?.canonicalFile == context.filesDir.canonicalFile &&
+            it.name.startsWith("focus_background_") && it.name.endsWith(".jpg") }
+    }
+
+    suspend fun readForBackup(path: String?): ByteArray? = withContext(Dispatchers.IO) {
+        ownedFile(path)?.takeIf { it.isFile }?.also {
+            require(it.length() in 1..8_000_000) { "自定义背景图片过大" }
+        }?.readBytes()
+    }
+
+    suspend fun restoreFromBackup(bytes: ByteArray): String = withContext(Dispatchers.IO) {
+        require(bytes.size in 1..8_000_000) { "备份图片大小无效" }
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        require(bounds.outWidth in 1..1920 && bounds.outHeight in 1..1920) { "备份图片格式或尺寸无效" }
+        val file = File.createTempFile("focus_background_", ".jpg", context.filesDir)
+        try { file.writeBytes(bytes); file.absolutePath }
+        catch (e: Exception) { file.delete(); throw e }
+    }
+
     suspend fun import(uri: Uri): String = withContext(Dispatchers.IO) {
         val resolver = context.contentResolver
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -39,10 +62,6 @@ class FocusBackgroundImageStore(private val context: Context) {
     }
 
     suspend fun deleteOwned(path: String?) = withContext(Dispatchers.IO) {
-        if (path != null) {
-            val file = File(path)
-            if (file.parentFile?.canonicalFile == context.filesDir.canonicalFile &&
-                file.name.startsWith("focus_background_") && file.name.endsWith(".jpg")) file.delete()
-        }
+        ownedFile(path)?.delete()
     }
 }

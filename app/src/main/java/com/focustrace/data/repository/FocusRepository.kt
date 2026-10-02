@@ -22,6 +22,12 @@ class FocusRepository(private val sessions: FocusSessionDao, private val distrac
     suspend fun deleteManual(id: Long) {
         check(sessions.deleteManual(id) == 1) { "记录不存在或不是手动记录" }
     }
+    suspend fun deleteRecord(id: Long) {
+        if (sessions.deleteFinished(id) == 0) {
+            check(sessions.getSession(id) != null) { "这条专注记录已不存在" }
+            error("正在专注、暂停或休息的记录不能删除，请先结束计时")
+        }
+    }
     fun taskFocusSeconds(taskId: Long) = sessions.observeTaskFocusSeconds(taskId)
     fun reportFor(id: Long) = sessions.observeReport(id).distinctUntilChanged()
         .map { row -> row?.takeIf { com.focustrace.statistics.isValidFocusSession(it.session) }

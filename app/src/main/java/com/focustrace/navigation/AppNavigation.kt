@@ -32,7 +32,7 @@ fun AppNavigation(container: AppContainer) {
     val controller = rememberNavController()
     val entry by controller.currentBackStackEntryAsState()
     Scaffold(bottomBar = {
-        if (entry?.destination?.route != "report/{sessionId}" && entry?.destination?.route != "focus") NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
+        if (entry?.destination?.route !in listOf("report/{sessionId}", "focus", "task-study/{taskId}")) NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
             Tab.entries.forEach { tab ->
                 NavigationBarItem(colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = MaterialTheme.colorScheme.primary,
@@ -53,7 +53,9 @@ fun AppNavigation(container: AppContainer) {
         Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
             NavHost(controller, startDestination = Tab.TODO.route, modifier = Modifier.widthIn(max = 640.dp).fillMaxSize()) {
                 composable(Tab.TODO.route) {
-                    TodoScreen(viewModel(factory = viewModelFactory { initializer { TodoViewModel(container) } }), onReport = { id -> controller.navigate("report/$id") }) {
+                    TodoScreen(viewModel(factory = viewModelFactory { initializer { TodoViewModel(container) } }),
+                        onReport = { id -> controller.navigate("report/$id") },
+                        onStudy = { id -> controller.navigate("task-study/$id") { launchSingleTop = true } }) {
                         controller.navigate("focus") {
                             popUpTo(controller.graph.findStartDestination().id) { saveState = true }
                             launchSingleTop = true
@@ -69,17 +71,26 @@ fun AppNavigation(container: AppContainer) {
                 composable("report/{sessionId}", arguments = listOf(navArgument("sessionId") { type = NavType.LongType })) { reportEntry ->
                     val sessionId = reportEntry.arguments!!.getLong("sessionId")
                     val fromStatistics = controller.previousBackStackEntry?.destination?.route == Tab.STATISTICS.route
-                    FocusResultScreen(viewModel(factory = viewModelFactory { initializer { FocusResultViewModel(container.focusRepository, sessionId) } }), backLabel = if (fromStatistics) "返回统计" else "返回待办") {
-                        if (fromStatistics) controller.popBackStack() else controller.popBackStack("todo", false)
+                    val fromTaskStudy = controller.previousBackStackEntry?.destination?.route == "task-study/{taskId}"
+                    FocusResultScreen(viewModel(factory = viewModelFactory { initializer { FocusResultViewModel(container.focusRepository, sessionId) } }),
+                        backLabel = if (fromStatistics) "返回统计" else if (fromTaskStudy) "返回学习详情" else "返回待办") {
+                        if (fromStatistics || fromTaskStudy) controller.popBackStack() else controller.popBackStack("todo", false)
                     }
                 }
+                composable("task-study/{taskId}", arguments = listOf(navArgument("taskId") { type = NavType.LongType })) { studyEntry ->
+                    val taskId = requireNotNull(studyEntry.arguments).getLong("taskId")
+                    TaskStudyScreen(viewModel(factory = viewModelFactory {
+                        initializer { TaskStudyViewModel(taskId, container.statisticsRepository, container.taskRepository,
+                            container.focusRepository, createSavedStateHandle()) }
+                    }), onBack = { controller.popBackStack() }, onReport = { id -> controller.navigate("report/$id") })
+                }
                 composable(Tab.STATISTICS.route) {
-                    StatisticsScreen(viewModel(factory = viewModelFactory { initializer { StatisticsViewModel(container.statisticsRepository, container.focusRepository, container.taskRepository, createSavedStateHandle()) } })) { id ->
+                    StatisticsScreen(viewModel(factory = viewModelFactory { initializer { StatisticsViewModel(container.statisticsRepository, container.focusRepository, container.taskRepository, container.settingsRepository, createSavedStateHandle()) } })) { id ->
                         controller.navigate("report/$id") { launchSingleTop = true }
                     }
                 }
                 composable(Tab.PROFILE.route) {
-                    ProfileScreen(viewModel(factory = viewModelFactory { initializer { SettingsViewModel(container.settingsRepository) } }))
+                    ProfileScreen(viewModel(factory = viewModelFactory { initializer { SettingsViewModel(container.settingsRepository, container.backupRepository) } }))
                 }
             }
         }

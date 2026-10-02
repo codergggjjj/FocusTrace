@@ -21,7 +21,7 @@ import java.time.format.DateTimeFormatter
 
 @Composable
 internal fun StudyRecordsDialog(state: LoadState<StatisticsSummary>, onDismiss: () -> Unit, onRetry: () -> Unit,
-    onAdd: () -> Unit, onEdit: (Long) -> Unit, onReport: (Long) -> Unit) {
+    onAdd: () -> Unit, onEdit: (Long) -> Unit, busy: Boolean, onDelete: (Long) -> Unit, onReport: (Long) -> Unit) {
     DetailWindow("专注记录", "关闭记录", onDismiss) {
         FilledTonalButton(onClick = onAdd) { Text("手动添加记录") }
         when (state) {
@@ -37,10 +37,13 @@ internal fun StudyRecordsDialog(state: LoadState<StatisticsSummary>, onDismiss: 
                         TraceCard(Modifier.testTag("study-session-${session.id}").clickable {
                             if (session.source == "MANUAL") onEdit(session.id) else onReport(session.id)
                         }) {
-                            Text(if (session.source == "MANUAL") "手动添加" else "计时记录",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (session.source == "MANUAL") MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurfaceVariant)
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Text(if (session.source == "MANUAL") "手动添加" else "计时记录", Modifier.weight(1f),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (session.source == "MANUAL") MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.onSurfaceVariant)
+                                DeleteFocusRecordButton(session, !busy) { onDelete(session.id) }
+                            }
                             Text(session.taskTitleSnapshot ?: "自由专注 / 原待办不可用", style = MaterialTheme.typography.titleMedium)
                             Text(compactDuration(session.focusSeconds), color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
                             Text("开始：${formatter.format(Instant.ofEpochMilli(session.startTime))}", style = MaterialTheme.typography.bodySmall)

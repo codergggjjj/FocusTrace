@@ -10,6 +10,7 @@ abstract class FocusTraceDatabase : RoomDatabase() {
     abstract fun categoryDao(): CategoryDao
     abstract fun focusSessionDao(): FocusSessionDao
     abstract fun distractionDao(): DistractionDao
+    abstract fun backupDao(): BackupDao
     companion object {
         val Migration6To7 = object : androidx.room.migration.Migration(6, 7) {
             override fun migrate(db: SupportSQLiteDatabase) {

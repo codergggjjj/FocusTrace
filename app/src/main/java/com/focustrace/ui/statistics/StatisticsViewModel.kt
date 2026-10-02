@@ -15,6 +15,7 @@ data class StatisticsSelection(val period: StatisticsPeriod, val range: Statisti
 class StatisticsViewModel(repository: StatisticsRepository,
     private val focusRepository: com.focustrace.data.repository.FocusRepository,
     taskRepository: com.focustrace.data.repository.TaskRepository,
+    private val settingsRepository: com.focustrace.data.repository.SettingsRepository,
     private val savedState: SavedStateHandle = SavedStateHandle()) : ViewModel() {
     val selectedTaskId = savedState.getStateFlow<Long?>("statisticsTaskId", null)
     val tasks = taskRepository.allTasks.asLoadState()
@@ -47,6 +48,9 @@ class StatisticsViewModel(repository: StatisticsRepository,
             viewDay(LocalDate.parse(date.trim()))
         }
     fun deleteManual(id: Long, onSuccess: () -> Unit) = changeRecord(onSuccess) { focusRepository.deleteManual(id) }
+    fun deleteRecord(id: Long, onSuccess: () -> Unit) = changeRecord(onSuccess) { focusRepository.deleteRecord(id) }
+    fun saveLearningGoals(daily: Int, weekly: Int, onSuccess: () -> Unit) =
+        changeRecord(onSuccess) { settingsRepository.setLearningGoals(daily, weekly) }
     private val period = savedState.getStateFlow("statisticsPeriod", StatisticsPeriod.DAY.name)
     private val anchor = savedState.getStateFlow<Long?>("statisticsAnchor", null)
     private val reload = MutableStateFlow(0)
@@ -58,6 +62,14 @@ class StatisticsViewModel(repository: StatisticsRepository,
         val range = statisticsRange(day?.let(LocalDate::ofEpochDay) ?: today, selected, zone)
         return StatisticsSelection(selected, range, range.start < statisticsRange(today, selected, zone).start)
     }
+    // Learning goals always cover all tasks today / this week, independently of historical filters.
+    val learningGoals = reload.flatMapLatest {
+        combine(calendar,
+            settingsRepository.settings.map { it.dailyGoalMinutes to it.weeklyGoalMinutes }.distinctUntilChanged()
+        ) { date, targets -> date to targets }
+            .flatMapLatest { (date, targets) -> repository.learningGoals(date.first, date.second, targets.first, targets.second) }
+            .asLoadState()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), LoadState.Loading)
     val selection = combine(period, anchor, calendar) { p, a, c -> selection(p, a, c.first, c.second) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), selection(period.value, anchor.value, LocalDate.now(), ZoneId.systemDefault()))
     val uiState = combine(selection, selectedTaskId, reload) { selected, taskId, _ -> selected to taskId }

@@ -5,6 +5,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -19,6 +20,13 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun FocusResultScreen(viewModel: FocusResultViewModel, backLabel: String = "返回待办", onBack: () -> Unit) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val deleting by viewModel.deleting.collectAsStateWithLifecycle()
+    val deleteError by viewModel.deleteError.collectAsStateWithLifecycle()
+    var confirmDelete by rememberSaveable { mutableStateOf(false) }
+    (state as? LoadState.Ready)?.value?.session?.takeIf { confirmDelete }?.let { record ->
+        DeleteFocusRecordDialog(record, deleting, deleteError, onDismiss = { confirmDelete = false },
+            onConfirm = { viewModel.deleteRecord(onBack) })
+    }
     BackHandler(onBack = onBack)
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -36,7 +44,9 @@ fun FocusResultScreen(viewModel: FocusResultViewModel, backLabel: String = "返�
                 when {
                     report == null -> Text("找不到这条专注记录。", Modifier.padding(24.dp))
                     !report.available -> Text("本轮尚未结束，结束后即可查看完整报告。", Modifier.padding(24.dp))
-                    else -> ReportContent(report, Modifier.weight(1f))
+                    else -> ReportContent(report, Modifier.weight(1f), deleting) {
+                        viewModel.clearDeleteError(); confirmDelete = true
+                    }
                 }
             }
         }
@@ -44,7 +54,7 @@ fun FocusResultScreen(viewModel: FocusResultViewModel, backLabel: String = "返�
 }
 
 @Composable
-private fun ReportContent(report: FocusReport, modifier: Modifier) {
+private fun ReportContent(report: FocusReport, modifier: Modifier, deleting: Boolean, onDelete: () -> Unit) {
     val s = report.session
     var showDistractions by remember { mutableStateOf(false) }
     val formatter = remember { DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault()) }
@@ -81,6 +91,13 @@ private fun ReportContent(report: FocusReport, modifier: Modifier) {
         if (report.events.isNotEmpty()) item {
             FilledTonalButton(onClick = { showDistractions = true }, modifier = Modifier.fillMaxWidth()) {
                 Text("查看分心记录")
+            }
+        }
+        item {
+            TextButton(onClick = onDelete, enabled = !deleting && s.status == 4,
+                modifier = Modifier.fillMaxWidth().testTag("report-delete-record"),
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
+                Text(if (s.status == 3) "正在休息，结束后可删除" else "删除专注记录")
             }
         }
     }

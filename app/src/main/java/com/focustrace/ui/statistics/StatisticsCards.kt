@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.focustrace.focus.formatDuration
@@ -52,37 +53,37 @@ internal fun StudyOverview(current: StatisticsSummary, previous: StatisticsSumma
     val averageDay = totals.focusSeconds / elapsedDays
     val averageSession = if (totals.sessions == 0) 0 else totals.focusSeconds / totals.sessions
     Card(shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("累计学习时间", style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = .75f))
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(compactDuration(totals.focusSeconds), style = MaterialTheme.typography.displaySmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.testTag("study-total").semantics {
                         contentDescription = "累计学习时间：${formatDuration(totals.focusSeconds)}"
                     })
                 Text(comparison, style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = .72f))
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OverviewNumber("${totals.sessions}", "专注次数", Modifier.weight(1f))
                 OverviewNumber("${totals.pomodoros}", "完成番茄", Modifier.weight(1f))
                 OverviewNumber(totals.focusPercent?.let { "$it%" } ?: "—", "专注率", Modifier.weight(1f))
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = .12f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .5f))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OverviewNumber(compactDuration(averageDay), "日均专注", Modifier.weight(1f), compact = true)
                 OverviewNumber(compactDuration(averageSession), "单次平均", Modifier.weight(1f), compact = true)
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(onClick = onRecords, modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onPrimaryContainer)) {
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)) {
                     Text("查看专注记录")
                 }
                 TextButton(onClick = onDetails, modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onPrimaryContainer)) {
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)) {
                     Text("分心详情")
                 }
             }
@@ -94,9 +95,9 @@ internal fun StudyOverview(current: StatisticsSummary, previous: StatisticsSumma
 private fun OverviewNumber(value: String, label: String, modifier: Modifier, compact: Boolean = false) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(3.dp)) {
         Text(value, style = if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onPrimaryContainer, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(label, style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = .7f))
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -199,7 +200,8 @@ private fun CompactHourBars(points: List<TrendPoint>, maximum: Long, selected: I
                         .height((80f * point.seconds.toFloat() / maximum).coerceAtLeast(if (point.seconds > 0) 3f else 0f).dp)
                         .clip(RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp)).background(color))
                 }
-                if (index % 2 == 0) Text("$index", style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                if (index % 2 == 0) Text("$index", modifier = Modifier.requiredWidth(24.dp),
+                    style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center, maxLines = 1)
                 else Spacer(Modifier.height(16.dp))
             }
         }
@@ -297,10 +299,10 @@ private fun HabitMetric(value: String, label: String, modifier: Modifier, emphas
 }
 
 @Composable
-internal fun StatisticsSection(title: String, subtitle: String? = null, content: @Composable ColumnScope.() -> Unit) {
-    Surface(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large,
+internal fun StatisticsSection(title: String, subtitle: String?, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    Surface(modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surface) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
                 Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f))

@@ -37,7 +37,7 @@ private val TodoCardRadius = 20.dp
 private enum class TodoFilter { PENDING, COMPLETED }
 
 @Composable
-fun TodoScreen(viewModel: TodoViewModel, onReport: (Long) -> Unit, onStarted: () -> Unit) {
+fun TodoScreen(viewModel: TodoViewModel, onReport: (Long) -> Unit, onStudy: (Long) -> Unit, onStarted: () -> Unit) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val busy by viewModel.busy.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
@@ -120,6 +120,7 @@ fun TodoScreen(viewModel: TodoViewModel, onReport: (Long) -> Unit, onStarted: ()
             val original = data.tasks.firstOrNull { it.id == editingId }
             TaskEditScreen(original, busy, data.defaultMinutes,
                 onAddRecord = { recordTaskId = original?.id },
+                onStudy = { original?.id?.let(onStudy) },
                 onDelete = { deletingId = original?.id },
                 onDismiss = { editorOpen = false },
                 onSave = { title, minutes, timerType -> viewModel.save(original, title, minutes, timerType) { editorOpen = false } })

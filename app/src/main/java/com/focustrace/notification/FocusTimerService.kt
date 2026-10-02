@@ -114,6 +114,7 @@ class FocusTimerService : Service() {
     }
 
     private suspend fun refreshAndPublish(allowCompletion: Boolean): Boolean {
+        container.screenFocusMonitor.checkState()
         container.lifecycle.awaitEvents()
         val beforeRefresh = container.database.focusSessionDao().latest()
         val current = container.pomodoro.refresh()

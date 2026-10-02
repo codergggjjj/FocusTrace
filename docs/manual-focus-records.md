@@ -11,9 +11,10 @@
 - 沿用 focus_sessions 表，新增 source（TIMER / MANUAL）及可空 note。数据库 6→7 迁移将旧记录默认标为 TIMER。
 - 手动记录使用 FINISHED 状态、正向计时类型、零计划时间；有效时长等于起止时间差，分心为零，不增加“完成番茄”数量。
 - 原有日、周、月、小时分布、热力图和历史查询均直接读取同一记录，Room Flow 在增删改后通知统计刷新。
-- 任务关联存入 taskId，标题保留快照；新增 taskFocusSeconds 查询接口同时汇总 TIMER 和 MANUAL。当前项目尚无独立的任务时长统计页面，本次没有新增该页面。
+- 任务关联存入 taskId，标题保留快照；taskFocusSeconds 查询接口同时汇总 TIMER 和 MANUAL。“编辑待办 → 学习详情”可查看累计学习和关联记录，详见 [待办学习详情](task-study.md)。
 - 计时器的 latest / observeLatest 仅读取 TIMER，避免补录遮住活动计时或干扰休息轮转、后台分心结算。
 - 手动更新和删除 SQL 限定 source = MANUAL 且 status = FINISHED，拒绝通过补录功能修改正常计时记录。
+- 历史列表、学习详情和单次报告另提供统一的删除入口，可确认删除已结束的 TIMER / MANUAL 记录；不影响手动编辑限定 MANUAL 的规则。
 - 本次不做重叠时间去重，统计仍按每条记录累加；不支持跨天补录。
 
 ## 验证
