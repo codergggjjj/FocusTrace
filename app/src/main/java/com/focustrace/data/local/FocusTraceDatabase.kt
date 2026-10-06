@@ -4,7 +4,7 @@ import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.focustrace.data.local.dao.*
 import com.focustrace.data.local.entity.*
-@Database(entities = [CategoryEntity::class, TaskEntity::class, FocusSessionEntity::class, DistractionEventEntity::class], version = 7, exportSchema = true)
+@Database(entities = [CategoryEntity::class, TaskEntity::class, FocusSessionEntity::class, DistractionEventEntity::class], version = 8, exportSchema = true)
 abstract class FocusTraceDatabase : RoomDatabase() {
     abstract fun taskDao(): TaskDao
     abstract fun categoryDao(): CategoryDao
@@ -12,6 +12,14 @@ abstract class FocusTraceDatabase : RoomDatabase() {
     abstract fun distractionDao(): DistractionDao
     abstract fun backupDao(): BackupDao
     companion object {
+        val Migration7To8 = object : androidx.room.migration.Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE tasks ADD COLUMN repeatLastDate TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE tasks ADD COLUMN repeatParentId INTEGER DEFAULT NULL")
+                db.execSQL("ALTER TABLE tasks ADD COLUMN repeatDate TEXT DEFAULT NULL")
+                db.execSQL("CREATE UNIQUE INDEX index_tasks_repeatParentId_repeatDate ON tasks(repeatParentId, repeatDate)")
+            }
+        }
         val Migration6To7 = object : androidx.room.migration.Migration(6, 7) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE focus_sessions ADD COLUMN source TEXT NOT NULL DEFAULT 'TIMER'")

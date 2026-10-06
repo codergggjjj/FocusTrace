@@ -42,6 +42,7 @@ internal object BackupFormat {
             put("repeatType", value.repeatType); put("reminderTime", value.reminderTime)
             put("createdAt", value.createdAt); put("updatedAt", value.updatedAt)
             put("timerType", value.timerType)
+            put("repeatLastDate", value.repeatLastDate); put("repeatParentId", value.repeatParentId); put("repeatDate", value.repeatDate)
         }) } })
         put("sessions", JSONArray().apply { data.sessions.forEach { value -> put(JSONObject().apply {
             put("id", value.id); put("taskId", value.taskId); put("type", value.type)
@@ -91,7 +92,9 @@ internal object BackupFormat {
             title = value.getString("title"), targetMinutes = value.getInt("targetMinutes"),
             completed = value.getBoolean("completed"), repeatType = value.getString("repeatType"),
             reminderTime = value.nullableLong("reminderTime"), createdAt = value.getLong("createdAt"),
-            updatedAt = value.getLong("updatedAt"), timerType = value.getInt("timerType")) }
+            updatedAt = value.getLong("updatedAt"), timerType = value.getInt("timerType"),
+            repeatLastDate = value.nullableString("repeatLastDate"), repeatParentId = value.nullableLong("repeatParentId"),
+            repeatDate = value.nullableString("repeatDate")) }
         val sessions = root.getJSONArray("sessions").read { value -> FocusSessionEntity(
             id = value.getLong("id"), taskId = value.nullableLong("taskId"), type = value.getInt("type"),
             startTime = value.getLong("startTime"), endTime = value.nullableLong("endTime"),
@@ -144,6 +147,15 @@ internal object BackupFormat {
         require(data.distractions.all { it.sessionId in sessionIds && it.durationSeconds >= 0 && it.foregroundTime >= it.backgroundTime }) {
             "分心记录关联或时间无效"
         }
+        require(data.tasks.all { TaskRepeat.valid(it.repeatType) &&
+            (it.repeatParentId == null || (it.repeatParentId > 0 && it.repeatType == "NONE" && it.repeatDate != null)) &&
+            (it.repeatDate == null || it.repeatParentId != null) }) { "重复待办规则无效" }
+        data.tasks.forEach { task ->
+            task.repeatLastDate?.let(java.time.LocalDate::parse)
+            task.repeatDate?.let(java.time.LocalDate::parse)
+        }
+        val occurrences = data.tasks.filter { it.repeatParentId != null }.map { it.repeatParentId to it.repeatDate }
+        require(occurrences.distinct().size == occurrences.size) { "重复待办日期冲突" }
         require(data.tasks.all { it.title.isNotBlank() && it.targetMinutes in 0..1440 && it.timerType in 0..1 }) {
             "备份含有无效待办"
         }

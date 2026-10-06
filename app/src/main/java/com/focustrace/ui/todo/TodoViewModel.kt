@@ -50,6 +50,7 @@ class TodoViewModel(private val container: com.focustrace.data.AppContainer) : V
     private val todayRange = flow {
         while (currentCoroutineContext().isActive) {
             val zone = ZoneId.systemDefault()
+            repository.refreshRepeats()
             emit(statisticsRange(LocalDate.now(zone), StatisticsPeriod.DAY, zone))
             delay(60_000)
         }
@@ -81,12 +82,12 @@ class TodoViewModel(private val container: com.focustrace.data.AppContainer) : V
             finally { _busy.value = false }
         }
     }
-    fun save(original: TaskEntity?, title: String, minutes: Int, timerType: Int, done: () -> Unit) {
+    fun save(original: TaskEntity?, title: String, minutes: Int, timerType: Int, repeatType: String, done: () -> Unit) {
         require(title.trim().isNotEmpty() && minutes in 1..1440 && timerType in 0..1)
         write {
             val now = System.currentTimeMillis()
-            val task = original?.copy(title = title.trim(), targetMinutes = minutes, timerType = timerType, categoryId = null, updatedAt = now)
-                ?: TaskEntity(title = title.trim(), targetMinutes = minutes, timerType = timerType, createdAt = now, updatedAt = now)
+            val task = original?.copy(title = title.trim(), targetMinutes = minutes, repeatType = repeatType, timerType = timerType, categoryId = null, updatedAt = now)
+                ?: TaskEntity(title = title.trim(), targetMinutes = minutes, repeatType = repeatType, timerType = timerType, createdAt = now, updatedAt = now)
             if (original == null) repository.insert(task) else repository.update(task)
             done()
         }

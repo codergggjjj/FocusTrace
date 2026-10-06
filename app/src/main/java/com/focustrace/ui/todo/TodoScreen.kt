@@ -123,7 +123,7 @@ fun TodoScreen(viewModel: TodoViewModel, onReport: (Long) -> Unit, onStudy: (Lon
                 onStudy = { original?.id?.let(onStudy) },
                 onDelete = { deletingId = original?.id },
                 onDismiss = { editorOpen = false },
-                onSave = { title, minutes, timerType -> viewModel.save(original, title, minutes, timerType) { editorOpen = false } })
+                onSave = { title, minutes, timerType, repeatType -> viewModel.save(original, title, minutes, timerType, repeatType) { editorOpen = false } })
         }
         recordTaskId?.let { taskId ->
             com.focustrace.ui.statistics.ManualRecordDialog(
@@ -249,6 +249,10 @@ private fun TaskCard(task: TaskEntity, todaySessions: Int, active: Boolean, busy
                 Text(task.title, style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis,
                     textDecoration = if (task.completed) TextDecoration.LineThrough else null,
                     color = if (task.completed) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
+                if (task.repeatType != "NONE" || task.repeatDate != null) Text(
+                    if (task.repeatType != "NONE") com.focustrace.data.repository.TaskRepeat.label(task.repeatType)
+                    else "重复待办 · ${task.repeatDate}", style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary)
                 val mode = if (task.timerType == 1) "正向计时" else "番茄钟 · ${task.targetMinutes} 分钟"
                 val progress = when {
                     task.completed -> "已完成"

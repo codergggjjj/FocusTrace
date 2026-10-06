@@ -15,11 +15,12 @@ import com.focustrace.data.local.entity.TaskEntity
 
 @Composable
 fun TaskEditScreen(task: TaskEntity?, busy: Boolean, defaultMinutes: Int,
-    onDelete: () -> Unit, onDismiss: () -> Unit, onSave: (String, Int, Int) -> Unit,
+    onDelete: () -> Unit, onDismiss: () -> Unit, onSave: (String, Int, Int, String) -> Unit,
     onAddRecord: () -> Unit, onStudy: () -> Unit) {
     var title by rememberSaveable(task?.id) { mutableStateOf(task?.title ?: "") }
     var minutes by rememberSaveable(task?.id) { mutableStateOf(task?.targetMinutes?.toString() ?: defaultMinutes.toString()) }
     var timerType by rememberSaveable(task?.id) { mutableIntStateOf(task?.timerType ?: 0) }
+    var repeatType by rememberSaveable(task?.id) { mutableStateOf(task?.repeatType ?: "NONE") }
     val duration = minutes.toIntOrNull()
     AlertDialog(onDismissRequest = { if (!busy) onDismiss() }, title = { Text(if (task == null) "创建待办" else "编辑待办") },
         text = {
@@ -38,6 +39,32 @@ fun TaskEditScreen(task: TaskEntity?, busy: Boolean, defaultMinutes: Int,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), enabled = !busy,
                     isError = duration == null || duration !in 1..1440,
                     supportingText = { Text("请输入 1–1440 分钟") })
+                if (task?.repeatParentId == null) {
+                    Text("重复", style = MaterialTheme.typography.titleSmall)
+                    listOf("NONE", "DAILY", "WEEKDAYS", "DAYS:").forEach { rule ->
+                        FilterChip(selected = if (rule == "DAYS:") repeatType.startsWith(rule) else repeatType == rule,
+                            onClick = { repeatType = rule }, enabled = !busy,
+                            modifier = Modifier.testTag("repeat-$rule"),
+                            label = { Text(if (rule == "DAYS:") "指定星期" else com.focustrace.data.repository.TaskRepeat.label(rule)) })
+                    }
+                    if (repeatType.startsWith("DAYS:")) {
+                        listOf(1..4, 5..7).forEach { days ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                days.forEach { day ->
+                                    val selected = day.toString() in repeatType.removePrefix("DAYS:")
+                                    FilterChip(selected = selected, enabled = !busy,
+                                        onClick = {
+                                            val values = repeatType.removePrefix("DAYS:").toCharArray().toMutableSet()
+                                            if (selected) values.remove('0' + day) else values.add('0' + day)
+                                            repeatType = "DAYS:" + values.sorted().joinToString("")
+                                        }, modifier = Modifier.testTag("repeat-day-$day"), label = { Text("一二三四五六日"[day - 1].toString()) })
+                                }
+                            }
+                        }
+                    }
+                    if (repeatType != "NONE") Text("从下个符合日期起，打开待办页时生成当天任务；不补建错过的日期。",
+                        style = MaterialTheme.typography.bodySmall)
+                } else Text("本次来自重复待办；重复规则在原待办中修改。", style = MaterialTheme.typography.bodySmall)
                 if (task != null) {
                     OutlinedButton(onClick = onStudy, enabled = !busy) { Text("学习详情") }
                     FilledTonalButton(onClick = onAddRecord, enabled = !busy) { Text("添加专注记录") }
@@ -49,7 +76,7 @@ fun TaskEditScreen(task: TaskEntity?, busy: Boolean, defaultMinutes: Int,
                 }
             }
         },
-        confirmButton = { Button(enabled = !busy && title.isNotBlank() && (timerType == 1 || (duration != null && duration in 1..1440)),
-            onClick = { onSave(title, duration?.takeIf { it in 1..1440 } ?: 25, timerType) }) { Text(if (busy) "保存中…" else "保存") } },
+        confirmButton = { Button(enabled = !busy && com.focustrace.data.repository.TaskRepeat.valid(repeatType) && title.isNotBlank() && (timerType == 1 || (duration != null && duration in 1..1440)),
+            onClick = { onSave(title, duration?.takeIf { it in 1..1440 } ?: 25, timerType, repeatType) }) { Text(if (busy) "保存中…" else "保存") } },
         dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text("取消") } })
 }

@@ -2,7 +2,7 @@
 
 记录每一次专注，也看见每一次分心。
 
-[下载 FocusTrace v1.0.10 APK](https://github.com/codergggjjj/FocusTrace/releases/download/v1.0.10/FocusTrace-v1.0.10-performance.apk) · [发布范围与说明](docs/release-v1.0.10.md)
+[下载 FocusTrace v1.0.11 APK](https://github.com/codergggjjj/FocusTrace/releases/download/v1.0.11/FocusTrace-v1.0.11-performance.apk) · [发布范围与说明](docs/release-v1.0.11.md)
 
 此版本使用 debug 签名，面向 Android 8.0 及以上，按当前已实现功能发布。
 
@@ -18,9 +18,12 @@
 Windows 命令行验证：
 
 ```powershell
-.\gradlew.bat assembleDebug lintDebug
-.\gradlew.bat connectedDebugAndroidTest
+.\scripts\test.ps1
+# 仅在需要设备交互验证时，指定相关测试：
+.\scripts\test.ps1 -Scope Device -Tests com.focustrace.StatisticsHourLabelTest
 ```
+
+测试范围、预算与失败处理见 [分层测试规范](docs/testing.md)。默认不启动模拟器、不运行全量仪器测试。
 
 调试 APK：`app/build/outputs/apk/debug/app-debug.apk`。发布签名和应用商店发布不属于此阶段。
 
@@ -79,7 +82,7 @@ docs/                阶段说明与验证结果
 
 点击待办进入编辑页后，可打开“学习详情”：查看该待办累计学习时长、专注次数、学习天数、平均单次时长、近 7/30 天趋势和全部关联记录。支持打开计时报告、补录、编辑手动记录及确认删除已结束的记录，详见 [待办学习详情](docs/task-study.md)。
 
-番茄钟支持关联待办或自由专注、自定义专注/休息时长、暂停继续、提前结束、休息倒计时及本轮摘要。时间锚点持久化到 Room，数据库已升级为版本 7，提供 1→2→3→4→5→6→7 迁移。
+番茄钟支持关联待办或自由专注、自定义专注/休息时长、暂停继续、提前结束、休息倒计时及本轮摘要。时间锚点持久化到 Room，数据库已升级为版本 8，提供 1→2→3→4→5→6→7→8 迁移。
 
 正向计时从零开始，不设计划截止时间，支持暂停、恢复与结束保存，不自动进入休息。
 
@@ -101,7 +104,7 @@ docs/                阶段说明与验证结果
 
 “我的 → 备份与恢复”支持将待办、专注记录、分心事件、设置和自定义背景图导出到用户选择的本地文件，也可在预览内容后确认替换并恢复。正在计时或休息时不可操作；备份文件未加密，请自行保管。详见 [本地备份说明](docs/local-backup.md)。
 
-下一阶段建议开发重复待办和提醒。
+待办支持每天、工作日或指定星期重复。打开待办页时生成当天任务，同日防重、不补建错过日期；关闭原待办重复规则可停止后续生成。详见 [重复待办](docs/repeating-tasks.md)。
 
 界面采用粉白与浅蓝搭配的简约主题，支持深色模式；详见 [视觉优化说明](docs/ui-polish.md)。
 
