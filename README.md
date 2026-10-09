@@ -2,7 +2,7 @@
 
 记录每一次专注，也看见每一次分心。
 
-[下载 FocusTrace v1.0.11 APK](https://github.com/codergggjjj/FocusTrace/releases/download/v1.0.11/FocusTrace-v1.0.11-performance.apk) · [发布范围与说明](docs/release-v1.0.11.md)
+[下载 FocusTrace v1.0.12 APK](https://github.com/codergggjjj/FocusTrace/releases/download/v1.0.12/FocusTrace-v1.0.12-performance.apk) · [发布范围与说明](docs/release-v1.0.12.md)
 
 此版本使用 debug 签名，面向 Android 8.0 及以上，按当前已实现功能发布。
 
@@ -90,7 +90,7 @@ docs/                阶段说明与验证结果
 
 专注或休息期间显示常驻通知，可直接暂停、继续和结束；番茄自然完成及休息结束会发送完成提醒。Android 13 及以上首次运行会申请通知权限，提示音可在“我的”中关闭，详见 [通知说明](docs/notifications.md)。
 
-分心检测默认阈值 3 秒，支持严格 0 秒、普通 3 秒、宽松 10 秒和自定义值。只有正在专注时记录，暂停、休息和空闲不记录；达到阈值的离开时间从有效专注中扣除。本轮可查看次数、总时间及离开/返回明细。
+分心检测默认阈值 3 秒，支持严格 0 秒、普通 3 秒、宽松 10 秒和自定义值。只有正在专注时记录，暂停、休息和空闲不记录；达到阈值的离开时间从有效专注中扣除。本轮可查看次数、总时间及离开/返回明细。分心时长统一显示为分钟和秒，例如“2 分钟 5 秒”。
 
 切到其他应用后息屏，息屏前达到阈值的离开时间计为分心，息屏和锁屏期间继续累计专注；解锁后仍在其他应用时重新计算离开。屏幕广播、显示状态监听和常驻计时服务的状态校验共同处理息屏豁免，详见 [锁屏与息屏说明](docs/screen-lock-exemption.md)。
 

@@ -39,3 +39,8 @@ fun formatDuration(seconds: Long): String {
     return if (safe >= 3600) "${safe / 3600} 时 ${safe % 3600 / 60} 分 ${safe % 60} 秒"
         else "${safe / 60} 分 ${safe % 60} 秒"
 }
+
+fun formatDistractionDuration(seconds: Long): String {
+    val safe = seconds.coerceAtLeast(0)
+    return "${safe / 60} 分钟 ${safe % 60} 秒"
+}

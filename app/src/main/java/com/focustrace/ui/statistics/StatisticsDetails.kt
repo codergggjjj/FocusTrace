@@ -12,7 +12,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.focustrace.focus.formatDuration
+import com.focustrace.focus.formatDistractionDuration
 import com.focustrace.statistics.*
 import com.focustrace.ui.components.*
 import java.time.Instant
@@ -62,7 +62,7 @@ internal fun FocusDetailsDialog(totals: StatisticsTotals, onDismiss: () -> Unit)
     AlertDialog(onDismissRequest = onDismiss, title = { Text("分心详情") }, text = {
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             DetailMetric("分心次数", "${totals.distractions} 次")
-            DetailMetric("分心时间", formatDuration(totals.distractionSeconds))
+            DetailMetric("分心时间", formatDistractionDuration(totals.distractionSeconds))
             DetailMetric("专注率", totals.focusPercent?.let { "$it%" } ?: "—")
         }
     }, confirmButton = { TextButton(onClick = onDismiss) { Text("关闭") } })

@@ -83,7 +83,7 @@ fun FocusHomeScreen(viewModel: FocusViewModel, onExit: () -> Unit, onReport: (Lo
                     modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("本轮分心", style = MaterialTheme.typography.titleSmall, color = foreground)
-                        Text("${s.distractionCount} 次  ·  ${s.distractionSeconds} 秒",
+                        Text("${s.distractionCount} 次  ·  ${com.focustrace.focus.formatDistractionDuration(s.distractionSeconds)}",
                             style = MaterialTheme.typography.bodyLarge, color = foreground)
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically) {

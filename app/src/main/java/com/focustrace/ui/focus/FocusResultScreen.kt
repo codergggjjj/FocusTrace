@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.focustrace.focus.FocusReport
 import com.focustrace.focus.formatDuration
+import com.focustrace.focus.formatDistractionDuration
 import com.focustrace.ui.components.*
 import java.time.Instant
 import java.time.ZoneId
@@ -83,7 +84,7 @@ private fun ReportContent(report: FocusReport, modifier: Modifier, deleting: Boo
                     ReportMetric("专注率", report.focusPercent?.let { "$it%" } ?: "—",
                         Modifier.weight(1f), valueTag = "report-focus-percent")
                     ReportMetric("分心", "${report.events.size} 次", Modifier.weight(1f))
-                    ReportMetric("分心时长", formatDuration(report.distractionSeconds), Modifier.weight(1f))
+                    ReportMetric("分心时长", formatDistractionDuration(report.distractionSeconds), Modifier.weight(1f))
                 }
             }
         }

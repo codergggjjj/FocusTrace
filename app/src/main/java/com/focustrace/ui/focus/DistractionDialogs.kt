@@ -41,7 +41,7 @@ fun DistractionHistoryDialog(events: List<DistractionEventEntity>, onDismiss: ()
             items(events, key = { it.id }) { event ->
                 Column {
                     Text("${formatter.format(Instant.ofEpochMilli(event.backgroundTime))} → ${formatter.format(Instant.ofEpochMilli(event.foregroundTime))}")
-                    Text("离开 ${event.durationSeconds / 60} 分 ${event.durationSeconds % 60} 秒")
+                    Text("离开 ${com.focustrace.focus.formatDistractionDuration(event.durationSeconds)}")
                 }
             }
         }
