@@ -78,6 +78,7 @@ fun FocusHomeScreen(viewModel: FocusViewModel, onExit: () -> Unit, onReport: (Lo
                         Text(if (s.status == 3) "结束休息" else "结束专注")
                     }
                 }
+                FocusAudioControls(viewModel, immersive, focusing = s.status == 1)
                 Surface(shape = MaterialTheme.shapes.large,
                     color = if (immersive) Color.Black.copy(alpha = 0.42f) else MaterialTheme.colorScheme.surface,
                     modifier = Modifier.fillMaxWidth()) {

@@ -1,0 +1,101 @@
+package com.focustrace
+
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.test.core.app.ApplicationProvider
+import com.focustrace.data.repository.FocusAudioRepository
+import com.focustrace.notification.FocusTimerService
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
+import org.junit.Assert.*
+import org.junit.Rule
+import org.junit.Test
+import java.io.File
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+
+class FocusAudioTest {
+    @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+    private val app get() = ApplicationProvider.getApplicationContext<FocusTraceApplication>()
+
+    @Test fun importCopiesAudioAndRejectsInvalidInputWithoutChangingLibrary() = runBlocking<Unit> {
+        val repository = app.container.focusAudioRepository
+        val previous = repository.library.first()
+        val source = makeWave()
+        val invalid = File.createTempFile("audio_invalid_", ".txt", app.cacheDir).apply { writeText("not audio") }
+        val track = repository.importAudio(Uri.fromFile(source))
+        try {
+            assertTrue(source.delete())
+            repository.open(track).use { assertTrue(it.statSize > 44) }
+            val recreated = FocusAudioRepository(app).library.first()
+            assertEquals(track.id, recreated.selectedId)
+            assertTrue(recreated.tracks.contains(track))
+            try { repository.importAudio(Uri.fromFile(invalid)); fail("Invalid audio was accepted") }
+            catch (expected: Exception) { assertFalse(expected is CancellationException) }
+            assertEquals(recreated, repository.library.first())
+        } finally {
+            repository.remove(track.id)
+            previous.selectedId?.let { repository.select(it) }
+            source.delete()
+            invalid.delete()
+        }
+    }
+
+    @Test fun playbackPausesWithFocusAndStopsOnFinishWithoutChangingTimer() = runBlocking<Unit> {
+        val container = app.container
+        val repository = container.focusAudioRepository
+        val previous = repository.library.first()
+        val source = makeWave()
+        val track = repository.importAudio(Uri.fromFile(source))
+        val audio = container.focusAudioPlayer
+        try {
+            container.lifecycle.awaitEvents()
+            container.pomodoro.finish()
+            container.pomodoro.startStopwatch(null)
+            val session = requireNotNull(container.database.focusSessionDao().latest())
+            withTimeout(5000) { audio.state.first { it.canPlay && it.track?.id == track.id } }
+            withContext(Dispatchers.Main) { audio.play() }
+            withTimeout(5000) { audio.state.first { it.playing } }
+            assertEquals(session.id, container.database.focusSessionDao().latest()?.id)
+            withContext(Dispatchers.Main) { audio.pause() }
+            assertFalse(audio.state.value.playing)
+            assertEquals(1, container.database.focusSessionDao().latest()?.status)
+            withContext(Dispatchers.Main) { audio.play() }
+            withTimeout(5000) { audio.state.first { it.playing } }
+            container.pomodoro.pause()
+            withTimeout(5000) { audio.state.first { !it.canPlay && !it.playing } }
+            container.pomodoro.resume()
+            withTimeout(5000) { audio.state.first { it.canPlay } }
+            assertFalse(audio.state.value.playing) // Explicit user resume, never surprise autoplay.
+            withContext(Dispatchers.Main) { audio.play() }
+            withTimeout(5000) { audio.state.first { it.playing } }
+            // An external-app background marker alone must not stop the audio.
+            container.lifecycle.transition(false, false)
+            container.lifecycle.awaitEvents()
+            withContext(Dispatchers.Main) { assertTrue(audio.state.value.playing) }
+            container.lifecycle.transition(false, true)
+            container.lifecycle.awaitEvents()
+            withContext(Dispatchers.Main) { assertTrue(audio.state.value.playing) }
+            container.pomodoro.finish()
+            withTimeout(5000) { audio.state.first { !it.canPlay && !it.foregroundActive } }
+        } finally {
+            container.pomodoro.finish()
+            withContext(Dispatchers.Main) { audio.stop() }
+            app.stopService(Intent(app, FocusTimerService::class.java))
+            repository.remove(track.id)
+            previous.selectedId?.let { repository.select(it) }
+            source.delete()
+        }
+    }
+
+    private fun makeWave(): File {
+        val samples = 8_000 * 10
+        val buffer = ByteBuffer.allocate(44 + samples * 2).order(ByteOrder.LITTLE_ENDIAN)
+        buffer.put("RIFF".toByteArray()).putInt(36 + samples * 2).put("WAVEfmt ".toByteArray())
+        buffer.putInt(16).putShort(1).putShort(1).putInt(8_000).putInt(16_000).putShort(2).putShort(16)
+        buffer.put("data".toByteArray()).putInt(samples * 2)
+        repeat(samples) { buffer.putShort((kotlin.math.sin(it * 2 * Math.PI * 220 / 8_000) * 500).toInt().toShort()) }
+        return File.createTempFile("audio_test_", ".wav", app.cacheDir).apply { writeBytes(buffer.array()) }
+    }
+}

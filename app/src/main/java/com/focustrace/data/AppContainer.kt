@@ -19,5 +19,8 @@ class AppContainer(context: Context) {
     val backupRepository = BackupRepository(applicationContext, database, settingsStore, backgroundImages)
     val lifecycle = com.focustrace.lifecycle.FocusLifecycleCoordinator(pomodoro, settingsRepository, clock)
     val screenFocusMonitor = com.focustrace.lifecycle.ScreenFocusMonitor(applicationContext, lifecycle::transition)
+    val focusAudioRepository = FocusAudioRepository(applicationContext)
+    val focusAudioPlayer = com.focustrace.focus.FocusAudioPlayer(applicationContext, focusAudioRepository,
+        database.focusSessionDao().observeLatest(), ::startTimerNotification)
     fun startTimerNotification() = com.focustrace.notification.FocusTimerService.start(applicationContext)
 }

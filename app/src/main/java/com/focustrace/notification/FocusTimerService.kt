@@ -35,6 +35,8 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -53,6 +55,15 @@ class FocusTimerService : Service() {
         createChannels()
         startAsForeground(placeholderNotification())
         loop = scope.launch { monitorTimer() }
+        scope.launch {
+            container.focusAudioPlayer.state.map { Triple(it.track?.id, it.playing, it.preparing) }
+                .distinctUntilChanged().collect {
+                    lastSession?.takeIf { session -> session.status in ACTIVE_STATUSES }?.let { session ->
+                        startAsForeground(ongoingNotification(session))
+                        lastNotificationKey = null
+                    }
+                }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -78,6 +89,7 @@ class FocusTimerService : Service() {
                 container.pomodoro.finish()
                 stopTimerService()
             }
+            ACTION_AUDIO_TOGGLE -> container.focusAudioPlayer.toggle()
             ACTION_SYNC, null -> Unit
         }
         return START_STICKY
@@ -88,6 +100,7 @@ class FocusTimerService : Service() {
     override fun onDestroy() {
         loop?.cancel()
         scope.cancel()
+        container.focusAudioPlayer.stop()
         super.onDestroy()
     }
 
@@ -211,6 +224,11 @@ class FocusTimerService : Service() {
             2 -> builder.addAction(R.drawable.ic_notification_play, "继续", serviceIntent(ACTION_RESUME, 2))
         }
         builder.addAction(R.drawable.ic_notification_stop, if (session.status == 3) "结束休息" else "结束", serviceIntent(ACTION_FINISH, 3))
+        val music = container.focusAudioPlayer.state.value
+        if (session.status == 1 && music.track != null) {
+            builder.addAction(if (music.foregroundActive) R.drawable.ic_notification_pause else R.drawable.ic_notification_play,
+                if (music.foregroundActive) "暂停音乐" else "播放音乐", serviceIntent(ACTION_AUDIO_TOGGLE, 4))
+        }
         return builder.build()
     }
 
@@ -233,11 +251,15 @@ class FocusTimerService : Service() {
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
     private fun startAsForeground(notification: Notification) {
+        val mediaType = if (Build.VERSION.SDK_INT >= 29 && container.focusAudioPlayer.state.value.foregroundActive)
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK else 0
         ServiceCompat.startForeground(this, ONGOING_ID, notification,
-            if (Build.VERSION.SDK_INT >= 34) ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE else 0)
+            if (Build.VERSION.SDK_INT >= 34) ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or mediaType else mediaType)
     }
 
     private fun stopTimerService() {
+        lastSession = null
+        container.focusAudioPlayer.stop()
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
@@ -271,6 +293,7 @@ class FocusTimerService : Service() {
         private const val ACTION_PAUSE = "com.focustrace.notification.PAUSE"
         private const val ACTION_RESUME = "com.focustrace.notification.RESUME"
         private const val ACTION_FINISH = "com.focustrace.notification.FINISH"
+        private const val ACTION_AUDIO_TOGGLE = "com.focustrace.notification.AUDIO_TOGGLE"
         private val ACTIVE_STATUSES = listOf(1, 2, 3)
 
         fun start(context: Context) {
