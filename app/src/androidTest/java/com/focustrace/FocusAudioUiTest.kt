@@ -16,7 +16,22 @@ import org.junit.Test
 class FocusAudioUiTest {
     @get:Rule val compose = createComposeRule()
 
-    @Test fun focusScreenOffersImportAndMusicSelection() {
+    @Test fun settingsOffersBatchImport() {
+        val container = ApplicationProvider.getApplicationContext<FocusTraceApplication>().container
+        compose.setContent {
+            FocusTraceTheme {
+                com.focustrace.ui.settings.ProfileScreen(
+                    viewModel(factory = viewModelFactory { initializer { com.focustrace.ui.settings.SettingsViewModel(container.settingsRepository, container.backupRepository) } }),
+                    viewModel(factory = viewModelFactory { initializer { com.focustrace.ui.settings.MusicLibraryViewModel(container.focusAudioRepository, container.focusAudioPlayer) } }))
+            }
+        }
+        compose.waitUntil(5000) { compose.onAllNodesWithText("专注音乐").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("专注音乐").performScrollTo().performClick()
+        compose.onNodeWithTag("focus-audio-import").assertIsDisplayed()
+        compose.onNodeWithText("批量导入").assertIsDisplayed()
+    }
+
+    @Test fun focusScreenShowsCompactPlayerWithoutSlogans() {
         val container = ApplicationProvider.getApplicationContext<FocusTraceApplication>().container
         runBlocking {
             container.lifecycle.awaitEvents()
@@ -32,9 +47,9 @@ class FocusAudioUiTest {
                 }
             }
             compose.waitUntil(5000) { compose.onAllNodesWithText("正在专注").fetchSemanticsNodes().isNotEmpty() }
-            compose.onNodeWithText("专注音乐").performScrollTo().assertIsDisplayed()
-            compose.onNodeWithTag("focus-audio-library").performClick()
-            compose.onNodeWithTag("focus-audio-import").assertIsDisplayed()
+            compose.onNodeWithTag("focus-audio-toggle").performScrollTo().assertIsDisplayed()
+            compose.onNodeWithText("一次只做一件事").assertDoesNotExist()
+            compose.onNodeWithTag("focus-audio-import").assertDoesNotExist()
         } finally { runBlocking { container.pomodoro.finish() } }
     }
 }

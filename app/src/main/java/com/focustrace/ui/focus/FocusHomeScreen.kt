@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.activity.compose.BackHandler
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.PauseCircleOutline
 import androidx.compose.material.icons.outlined.PlayArrow
@@ -54,13 +55,13 @@ fun FocusHomeScreen(viewModel: FocusViewModel, onExit: () -> Unit, onReport: (Lo
         Box(Modifier.fillMaxSize()) {
             state.backgroundId?.let { FocusBackground(it, Modifier.fillMaxSize()) }
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 TextButton(onClick = onExit, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = null,
+                        tint = if (immersive) Color.White else MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(8.dp))
                     Text("返回待办", color = if (immersive) Color.White else MaterialTheme.colorScheme.primary)
                 }
-                Text("专注", style = MaterialTheme.typography.headlineLarge, color = foreground)
-                Text("一次只做一件事", style = MaterialTheme.typography.bodyMedium,
-                    color = if (immersive) Color.White.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant)
                 state.lifecycleError?.let { Text(it, color = MaterialTheme.colorScheme.errorContainer) }
                 state.error?.let { Text(it, color = MaterialTheme.colorScheme.errorContainer) }
                 LiveTimer(viewModel, s, state.tasks.firstOrNull { it.id == s.taskId }?.title
@@ -83,9 +84,12 @@ fun FocusHomeScreen(viewModel: FocusViewModel, onExit: () -> Unit, onReport: (Lo
                     color = if (immersive) Color.Black.copy(alpha = 0.42f) else MaterialTheme.colorScheme.surface,
                     modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("本轮分心", style = MaterialTheme.typography.titleSmall, color = foreground)
-                        Text("${s.distractionCount} 次  ·  ${com.focustrace.focus.formatDistractionDuration(s.distractionSeconds)}",
-                            style = MaterialTheme.typography.bodyLarge, color = foreground)
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text("本轮分心", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, color = foreground)
+                            Text("${s.distractionCount} 次 · ${com.focustrace.focus.formatDistractionDuration(s.distractionSeconds)}",
+                                style = MaterialTheme.typography.bodyMedium, color = foreground)
+                        }
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically) {
                             TextButton(onClick = { showDistractions = true }, contentPadding = PaddingValues(0.dp)) {
@@ -101,7 +105,7 @@ fun FocusHomeScreen(viewModel: FocusViewModel, onExit: () -> Unit, onReport: (Lo
                 }
             }
         }
-    } else BasePage("专注", "一次只做一件事") {
+    } else BasePage("计时", "") {
         TextButton(onClick = onExit) { Text("返回待办") }
         state.lifecycleError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }

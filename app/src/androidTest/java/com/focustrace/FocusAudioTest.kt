@@ -89,8 +89,53 @@ class FocusAudioTest {
         }
     }
 
-    private fun makeWave(): File {
-        val samples = 8_000 * 10
+    @Test fun batchImportAndPlaylistWrapRemainPausedForNewSession() = runBlocking<Unit> {
+        val container = app.container
+        val repository = container.focusAudioRepository
+        val previous = repository.library.first()
+        val first = makeWave(2)
+        val second = makeWave(2)
+        val invalid = File.createTempFile("audio_batch_invalid_", ".txt", app.cacheDir).apply { writeText("invalid") }
+        val audio = container.focusAudioPlayer
+        val model = com.focustrace.ui.settings.MusicLibraryViewModel(repository, audio)
+        val collector = launch { model.uiState.collect {} }
+        try {
+            withContext(Dispatchers.Main) { model.importAudio(listOf(Uri.fromFile(first), Uri.fromFile(invalid), Uri.fromFile(second))) }
+            withTimeout(10000) { model.uiState.first { !it.importing && it.message?.contains("已导入 2 首，1 首失败") == true } }
+            val library = repository.library.first()
+            val added = library.tracks.filter { track -> previous.tracks.none { it.id == track.id } }
+            assertEquals(2, added.size)
+            repository.select(added.first().id)
+            container.lifecycle.awaitEvents()
+            container.pomodoro.finish()
+            container.pomodoro.startStopwatch(null)
+            withTimeout(5000) { audio.state.first { it.canPlay && it.track?.id == added.first().id } }
+            assertFalse(audio.state.value.foregroundActive)
+            withContext(Dispatchers.Main) { audio.play() }
+            withTimeout(5000) { audio.state.first { it.playing && it.track?.id == added.first().id } }
+            withTimeout(6000) { audio.state.first { it.playing && it.track?.id == added.last().id } }
+            withTimeout(6000) { audio.state.first { it.playing && it.track?.id == library.tracks.first().id } }
+            withContext(Dispatchers.Main) { audio.pause() }
+            delay(2200)
+            assertFalse(audio.state.value.foregroundActive)
+            container.pomodoro.finish()
+            withTimeout(5000) { audio.state.first { !it.canPlay } }
+            container.pomodoro.startStopwatch(null)
+            withTimeout(5000) { audio.state.first { it.canPlay } }
+            assertFalse(audio.state.value.foregroundActive)
+        } finally {
+            collector.cancelAndJoin()
+            container.pomodoro.finish()
+            withContext(Dispatchers.Main) { audio.stop() }
+            app.stopService(Intent(app, FocusTimerService::class.java))
+            repository.library.first().tracks.filter { track -> previous.tracks.none { it.id == track.id } }.forEach { repository.remove(it.id) }
+            previous.selectedId?.let { repository.select(it) }
+            first.delete(); second.delete(); invalid.delete()
+        }
+    }
+
+    private fun makeWave(seconds: Int = 10): File {
+        val samples = 8_000 * seconds
         val buffer = ByteBuffer.allocate(44 + samples * 2).order(ByteOrder.LITTLE_ENDIAN)
         buffer.put("RIFF".toByteArray()).putInt(36 + samples * 2).put("WAVEfmt ".toByteArray())
         buffer.putInt(16).putShort(1).putShort(1).putInt(8_000).putInt(16_000).putShort(2).putShort(16)

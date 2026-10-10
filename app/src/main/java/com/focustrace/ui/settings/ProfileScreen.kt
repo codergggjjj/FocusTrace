@@ -22,8 +22,10 @@ import com.focustrace.data.datastore.ThemeMode
 import com.focustrace.ui.components.*
 
 @Composable
-fun ProfileScreen(viewModel: SettingsViewModel) {
+fun ProfileScreen(viewModel: SettingsViewModel, musicViewModel: MusicLibraryViewModel? = null) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    var editingMusic by rememberSaveable { mutableStateOf(false) }
+    if (editingMusic && musicViewModel != null) MusicLibraryDialog(musicViewModel) { editingMusic = false }
     var editing by rememberSaveable { mutableStateOf(false) }
     var editingBackground by rememberSaveable { mutableStateOf(false) }
     var showingBackup by rememberSaveable { mutableStateOf(false) }
@@ -104,6 +106,10 @@ fun ProfileScreen(viewModel: SettingsViewModel) {
                     settings.focusBackgroundRandom -> "随机显示内置图片"
                     else -> "固定内置图片"
                 }, !busy) { editingBackground = true }
+            }
+            if (musicViewModel != null) Column {
+                SettingsSection("声音")
+                SettingRow(Icons.Outlined.MusicNote, "专注音乐", "批量导入 · 列表循环", true) { editingMusic = true }
             }
             Column {
                 SettingsSection("数据")

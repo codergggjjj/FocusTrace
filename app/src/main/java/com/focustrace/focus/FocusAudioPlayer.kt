@@ -40,6 +40,8 @@ class FocusAudioPlayer(
         .setAudioAttributes(attributes).setWillPauseWhenDucked(true)
         .setOnAudioFocusChangeListener({ change -> if (change < 0) pause() }, Handler(Looper.getMainLooper())).build()
     private var player: MediaPlayer? = null
+    private var tracks = emptyList<FocusAudioTrack>()
+    private var selectedId: String? = null
     private var prepared = false
     private var generation = 0
     private var sessionId: Long? = null
@@ -60,7 +62,10 @@ class FocusAudioPlayer(
                     mutableState.update { it.copy(canPlay = false, error = "无法读取专注状态，音乐已停止") }
                 }
                 .collect { (id, status) ->
-                    if (sessionId != id || status !in listOf(1, 2)) stop()
+                    if (sessionId != id || status !in listOf(1, 2)) {
+                        stop()
+                        mutableState.update { it.copy(track = tracks.firstOrNull { track -> track.id == selectedId } ?: tracks.firstOrNull()) }
+                    }
                     else if (status == 2) pause()
                     sessionId = id
                     sessionStatus = status
@@ -70,8 +75,12 @@ class FocusAudioPlayer(
         scope.launch {
             repository.library.catch { stop(); mutableState.update { it.copy(error = "无法读取音乐列表") } }
                 .collect { library ->
-                    if (mutableState.value.track?.id != library.selected?.id) stop()
-                    mutableState.update { it.copy(track = library.selected) }
+                    tracks = library.tracks
+                    if (selectedId != library.selectedId || tracks.none { it.id == state.value.track?.id }) {
+                        stop()
+                        mutableState.update { it.copy(track = library.selected ?: tracks.firstOrNull()) }
+                    }
+                    selectedId = library.selectedId
                 }
         }
     }
@@ -102,7 +111,16 @@ class FocusAudioPlayer(
                     player = audio
                     audio.setAudioAttributes(attributes)
                     audio.setWakeMode(context, PowerManager.PARTIAL_WAKE_LOCK)
-                    audio.isLooping = true
+                    audio.isLooping = false
+                    audio.setOnCompletionListener { completed ->
+                        if (player === completed && request == generation && state.value.playing && sessionStatus == 1) {
+                            val index = tracks.indexOfFirst { it.id == track.id }
+                            val next = if (tracks.isEmpty()) null else tracks[(index + 1) % tracks.size]
+                            stop()
+                            mutableState.update { it.copy(track = next) }
+                            if (next != null) play()
+                        }
+                    }
                     audio.setOnPreparedListener {
                         if (player === it && request == generation) {
                             prepared = true

@@ -90,7 +90,8 @@ fun AppNavigation(container: AppContainer) {
                     }
                 }
                 composable(Tab.PROFILE.route) {
-                    ProfileScreen(viewModel(factory = viewModelFactory { initializer { SettingsViewModel(container.settingsRepository, container.backupRepository) } }))
+                    ProfileScreen(viewModel(factory = viewModelFactory { initializer { SettingsViewModel(container.settingsRepository, container.backupRepository) } }),
+                        viewModel(factory = viewModelFactory { initializer { MusicLibraryViewModel(container.focusAudioRepository, container.focusAudioPlayer) } }))
                 }
             }
         }

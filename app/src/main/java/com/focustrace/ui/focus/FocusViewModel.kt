@@ -2,7 +2,6 @@ package com.focustrace.ui.focus
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import android.net.Uri
 import com.focustrace.data.AppContainer
 import com.focustrace.data.datastore.UserSettings
 import com.focustrace.data.local.entity.*
@@ -20,39 +19,11 @@ class FocusViewModel(private val container: AppContainer) : ViewModel() {
     val uiState = _state.asStateFlow()
     private val _timer = MutableStateFlow(TimerUiState())
     val timer = _timer.asStateFlow()
-    private val audioImport = MutableStateFlow(false)
-    private val audioMessage = MutableStateFlow<String?>(null)
-    val audioState = combine(container.focusAudioRepository.library, container.focusAudioPlayer.state,
-        audioImport, audioMessage) { library, playback, importing, message ->
-        FocusAudioUiState(library, playback, importing, message)
+    val audioState = combine(container.focusAudioRepository.library, container.focusAudioPlayer.state) { library, playback ->
+        FocusAudioUiState(library, playback)
     }.catch { emit(FocusAudioUiState(message = "无法读取音乐列表，请重试")) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), FocusAudioUiState())
-
-    fun importAudio(uri: Uri) {
-        if (audioImport.value) return
-        audioImport.value = true
-        audioMessage.value = null
-        viewModelScope.launch {
-            try { container.focusAudioRepository.importAudio(uri); audioMessage.value = "已导入，点击播放即可开始" }
-            catch (error: CancellationException) { throw error }
-            catch (error: Exception) { audioMessage.value = (error as? IllegalArgumentException)?.message ?: "音频导入失败，请检查文件格式和剩余空间" }
-            finally { audioImport.value = false }
-        }
-    }
-    fun toggleAudio() { audioMessage.value = null; container.focusAudioPlayer.toggle() }
-    fun selectAudio(id: String) = audioAction { container.focusAudioRepository.select(id) }
-    fun removeAudio(id: String) = audioAction {
-        if (container.focusAudioPlayer.state.value.track?.id == id) container.focusAudioPlayer.stop()
-        container.focusAudioRepository.remove(id)
-    }
-    private fun audioAction(block: suspend () -> Unit) {
-        audioMessage.value = null
-        viewModelScope.launch {
-            try { block() }
-            catch (error: CancellationException) { throw error }
-            catch (error: Exception) { audioMessage.value = "音乐操作失败，请重试" }
-        }
-    }
+    fun toggleAudio() = container.focusAudioPlayer.toggle()
     init {
         viewModelScope.launch {
             uiState.map { state ->

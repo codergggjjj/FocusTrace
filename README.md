@@ -2,7 +2,7 @@
 
 记录每一次专注，也看见每一次分心。
 
-[下载 FocusTrace v1.0.13 APK](https://github.com/codergggjjj/FocusTrace/releases/download/v1.0.13/FocusTrace-v1.0.13-performance.apk) · [发布范围与说明](docs/release-v1.0.13.md)
+[下载 FocusTrace v1.0.14 APK](https://github.com/codergggjjj/FocusTrace/releases/download/v1.0.14/FocusTrace-v1.0.14-performance.apk) · [发布范围与说明](docs/release-v1.0.14.md)
 
 此版本使用 debug 签名，面向 Android 8.0 及以上，按当前已实现功能发布。
 
@@ -88,7 +88,7 @@ docs/                阶段说明与验证结果
 
 专注中的页面可显示沉浸式背景，内置湖畔、森林与海边三张风景插画；“我的 → 专注背景”可关闭背景、选择固定图片、勾选随机图片或导入自己的照片。自定义照片优先于内置图片，复制并缩放到应用私有目录；随机图片每轮选定一次，暂停、返回页面或重建后保持不变。详见 [专注背景说明](docs/focus-background.md)。
 
-专注页的“专注音乐 → 选择 / 导入”支持导入本地音频、选择曲目、循环播放、暂停和移除。音频复制到应用私有目录，记住上次选择但不自动播放；暂停专注时暂停音乐，结束或进入休息时停止。息屏期间可继续播放，详见 [专注音乐](docs/focus-audio.md)。音频暂不包含在本地备份中。
+“我的 → 专注音乐”支持批量导入本地音频、选择起始曲目和移除。专注页显示当前曲目和播放/暂停按钮，点击播放后按列表顺序循环所有音乐，每轮专注默认暂停。音频复制到应用私有目录，记住上次选择但不自动播放；暂停专注时暂停音乐，结束或进入休息时停止。息屏期间可继续播放，详见 [专注音乐](docs/focus-audio.md)。音频暂不包含在本地备份中。
 
 专注或休息期间显示常驻通知，可直接暂停、继续和结束；番茄自然完成及休息结束会发送完成提醒。Android 13 及以上首次运行会申请通知权限，提示音可在“我的”中关闭，详见 [通知说明](docs/notifications.md)。
 
