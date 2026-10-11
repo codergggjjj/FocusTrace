@@ -37,7 +37,7 @@ class BackupRepositoryTest {
         try {
             store.update(UserSettings(pomodoroMinutes = 40, dailyGoalMinutes = 120, weeklyGoalMinutes = 600))
             db.taskDao().insert(TaskEntity(id = 7, title = "操作系统", targetMinutes = 25,
-                createdAt = 1, updatedAt = 1))
+                createdAt = 1, updatedAt = 1, sortOrder = -7))
             db.focusSessionDao().insert(FocusSessionEntity(id = 9, taskId = 7, type = 0,
                 startTime = 1000, endTime = 500000, plannedSeconds = 1500,
                 focusSeconds = 499, status = 4, taskTitleSnapshot = "操作系统"))
@@ -61,6 +61,7 @@ class BackupRepositoryTest {
             repository.restore(uri)
 
             assertEquals("操作系统", db.taskDao().getTask(7)?.title)
+            assertEquals(-7L, db.taskDao().getTask(7)?.sortOrder)
             assertEquals("操作系统", db.focusSessionDao().getSession(9)?.taskTitleSnapshot)
             assertEquals(9L, db.distractionDao().getAll().first().single().sessionId)
             assertEquals(40, store.settings.first().pomodoroMinutes)

@@ -15,6 +15,7 @@ import androidx.compose.material.icons.outlined.CheckCircleOutline
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Timer
+import androidx.compose.material.icons.outlined.SwapVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -46,6 +47,7 @@ fun TodoScreen(viewModel: TodoViewModel, onReport: (Long) -> Unit, onStudy: (Lon
     var deletingId by rememberSaveable { mutableStateOf<Long?>(null) }
     var recordTaskId by rememberSaveable { mutableStateOf<Long?>(null) }
     var filter by rememberSaveable { mutableStateOf(TodoFilter.PENDING) }
+    var sorting by rememberSaveable { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val expandedFab by remember { derivedStateOf { listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset < 80 } }
     val readyData = (state as? LoadState.Ready)?.value
@@ -98,7 +100,14 @@ fun TodoScreen(viewModel: TodoViewModel, onReport: (Long) -> Unit, onStudy: (Lon
                         }
                     }
                     item(key = "filters", contentType = "filters") {
-                        TodoFilters(filter, pending, completed) { filter = it }
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            TodoFilters(filter, pending, completed, Modifier.weight(1f)) { filter = it }
+                            if (filter == TodoFilter.PENDING && pending > 1) IconButton(
+                                onClick = { sorting = true }, enabled = !busy, modifier = Modifier.testTag("todo-sort")) {
+                                Icon(Icons.Outlined.SwapVert, contentDescription = "调整待办顺序",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
                         Spacer(Modifier.height(6.dp))
                     }
                     if (visibleTasks.isEmpty()) item(key = "empty-${filter.name}", contentType = "empty") {
@@ -116,6 +125,8 @@ fun TodoScreen(viewModel: TodoViewModel, onReport: (Long) -> Unit, onStudy: (Lon
 
     val data = readyData
     if (data != null) {
+        if (sorting) TaskOrderDialog(data.tasks.filterNot { it.completed }, busy,
+            onMove = viewModel::movePending, onDismiss = { sorting = false })
         if (editorOpen) {
             val original = data.tasks.firstOrNull { it.id == editingId }
             TaskEditScreen(original, busy, data.defaultMinutes,
@@ -201,8 +212,8 @@ private fun FocusReportEntry(onClick: () -> Unit) {
 }
 
 @Composable
-private fun TodoFilters(selected: TodoFilter, pending: Int, completed: Int, onSelect: (TodoFilter) -> Unit) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+private fun TodoFilters(selected: TodoFilter, pending: Int, completed: Int, modifier: Modifier = Modifier, onSelect: (TodoFilter) -> Unit) {
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         FilterChip(selected = selected == TodoFilter.PENDING, onClick = { onSelect(TodoFilter.PENDING) },
             label = { Text("待完成 $pending") }, modifier = Modifier.testTag("todo-filter-pending"),
             colors = FilterChipDefaults.filterChipColors(selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,

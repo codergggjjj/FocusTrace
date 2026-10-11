@@ -11,8 +11,8 @@ android {
         applicationId = "com.focustrace"
         minSdk = 26
         targetSdk = 34
-        versionCode = 17
-        versionName = "1.0.15"
+        versionCode = 18
+        versionName = "1.0.16"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildTypes {
@@ -37,6 +37,11 @@ android {
     sourceSets["androidTest"].assets.srcDir("schemas")
 }
 ksp { arg("room.schemaLocation", "$projectDir/schemas") }
+
+// Package newly exported schemas after KSP so the first migration-test build includes them.
+tasks.configureEach {
+    if (name == "mergeDebugAndroidTestAssets") dependsOn("kspDebugKotlin")
+}
 
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2024.06.00"))

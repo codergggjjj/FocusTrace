@@ -4,7 +4,7 @@ import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.focustrace.data.local.dao.*
 import com.focustrace.data.local.entity.*
-@Database(entities = [CategoryEntity::class, TaskEntity::class, FocusSessionEntity::class, DistractionEventEntity::class], version = 8, exportSchema = true)
+@Database(entities = [CategoryEntity::class, TaskEntity::class, FocusSessionEntity::class, DistractionEventEntity::class], version = 9, exportSchema = true)
 abstract class FocusTraceDatabase : RoomDatabase() {
     abstract fun taskDao(): TaskDao
     abstract fun categoryDao(): CategoryDao
@@ -12,6 +12,11 @@ abstract class FocusTraceDatabase : RoomDatabase() {
     abstract fun distractionDao(): DistractionDao
     abstract fun backupDao(): BackupDao
     companion object {
+        val Migration8To9 = object : androidx.room.migration.Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE tasks ADD COLUMN sortOrder INTEGER NOT NULL DEFAULT 0")
+            }
+        }
         val Migration7To8 = object : androidx.room.migration.Migration(7, 8) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE tasks ADD COLUMN repeatLastDate TEXT DEFAULT NULL")

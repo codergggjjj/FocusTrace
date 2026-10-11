@@ -42,6 +42,7 @@ internal object BackupFormat {
             put("repeatType", value.repeatType); put("reminderTime", value.reminderTime)
             put("createdAt", value.createdAt); put("updatedAt", value.updatedAt)
             put("timerType", value.timerType)
+            put("sortOrder", value.sortOrder)
             put("repeatLastDate", value.repeatLastDate); put("repeatParentId", value.repeatParentId); put("repeatDate", value.repeatDate)
         }) } })
         put("sessions", JSONArray().apply { data.sessions.forEach { value -> put(JSONObject().apply {
@@ -94,7 +95,7 @@ internal object BackupFormat {
             reminderTime = value.nullableLong("reminderTime"), createdAt = value.getLong("createdAt"),
             updatedAt = value.getLong("updatedAt"), timerType = value.getInt("timerType"),
             repeatLastDate = value.nullableString("repeatLastDate"), repeatParentId = value.nullableLong("repeatParentId"),
-            repeatDate = value.nullableString("repeatDate")) }
+            repeatDate = value.nullableString("repeatDate"), sortOrder = value.optLong("sortOrder", 0L)) }
         val sessions = root.getJSONArray("sessions").read { value -> FocusSessionEntity(
             id = value.getLong("id"), taskId = value.nullableLong("taskId"), type = value.getInt("type"),
             startTime = value.getLong("startTime"), endTime = value.nullableLong("endTime"),

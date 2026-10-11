@@ -14,5 +14,6 @@ data class TaskEntity(
     @ColumnInfo(defaultValue = "0") val timerType: Int = 0, // 0: pomodoro, 1: stopwatch
     @ColumnInfo(defaultValue = "NULL") val repeatLastDate: String? = null,
     @ColumnInfo(defaultValue = "NULL") val repeatParentId: Long? = null,
-    @ColumnInfo(defaultValue = "NULL") val repeatDate: String? = null
+    @ColumnInfo(defaultValue = "NULL") val repeatDate: String? = null,
+    @ColumnInfo(defaultValue = "0") val sortOrder: Long = 0
 )

@@ -93,5 +93,6 @@ class TodoViewModel(private val container: com.focustrace.data.AppContainer) : V
         }
     }
     fun toggle(task: TaskEntity) = write { repository.update(task.copy(completed = !task.completed, updatedAt = System.currentTimeMillis())) }
+    fun movePending(id: Long, move: com.focustrace.data.repository.TaskMove) = write { repository.movePending(id, move) }
     fun delete(task: TaskEntity, done: () -> Unit) = write { repository.delete(task); done() }
 }
