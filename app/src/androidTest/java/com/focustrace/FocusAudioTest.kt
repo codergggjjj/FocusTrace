@@ -134,6 +134,54 @@ class FocusAudioTest {
         }
     }
 
+    @Test fun newSessionResumesLastAutomaticallyPlayedTrack() = runBlocking<Unit> {
+        val container = app.container
+        val repository = container.focusAudioRepository
+        val previous = repository.library.first()
+        val first = makeWave(2)
+        val second = makeWave(10)
+        val added = mutableListOf<com.focustrace.data.repository.FocusAudioTrack>()
+        val audio = container.focusAudioPlayer
+        try {
+            added += repository.importAudio(Uri.fromFile(first))
+            added += repository.importAudio(Uri.fromFile(second))
+            repository.select(added.first().id)
+            container.lifecycle.awaitEvents()
+            container.pomodoro.finish()
+            container.pomodoro.startStopwatch(null)
+            withTimeout(5000) { audio.state.first { it.canPlay && it.track?.id == added.first().id } }
+            withContext(Dispatchers.Main) { audio.play() }
+            withTimeout(6000) { audio.state.first { it.playing && it.track?.id == added.last().id } }
+            withContext(Dispatchers.Main) { audio.pause() }
+            container.pomodoro.finish()
+            withTimeout(5000) { audio.state.first { !it.canPlay } }
+            container.pomodoro.startStopwatch(null)
+            withTimeout(5000) { audio.state.first { it.canPlay } }
+            assertEquals("New session must keep the last played song", added.last().id, audio.state.value.track?.id)
+            assertFalse(audio.state.value.foregroundActive)
+            withTimeout(5000) { repository.library.first { it.selectedId == added.last().id } }
+            assertEquals(added.last().id, FocusAudioRepository(app).library.first().selectedId)
+            // Choosing another track explicitly still overrides the remembered song.
+            repository.select(added.first().id)
+            withTimeout(5000) { audio.state.first { it.track?.id == added.first().id } }
+            assertFalse(audio.state.value.foregroundActive)
+            assertFalse(repository.rememberPlaying(added.last().id, added.last().id))
+            assertEquals(added.first().id, repository.library.first().selectedId)
+            repository.remove(added.first().id)
+            withTimeout(5000) { audio.state.first { it.track != null && it.track?.id != added.first().id } }
+            assertFalse(audio.state.value.foregroundActive)
+        } finally {
+            container.pomodoro.finish()
+            withContext(Dispatchers.Main) { audio.stop() }
+            app.stopService(Intent(app, FocusTimerService::class.java))
+            val remaining = repository.library.first().tracks.map { it.id }.toSet()
+            added.filter { it.id in remaining }.forEach { repository.remove(it.id) }
+            previous.selectedId?.let { repository.select(it) }
+            first.delete()
+            second.delete()
+        }
+    }
+
     private fun makeWave(seconds: Int = 10): File {
         val samples = 8_000 * seconds
         val buffer = ByteBuffer.allocate(44 + samples * 2).order(ByteOrder.LITTLE_ENDIAN)

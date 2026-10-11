@@ -64,7 +64,6 @@ class FocusAudioPlayer(
                 .collect { (id, status) ->
                     if (sessionId != id || status !in listOf(1, 2)) {
                         stop()
-                        mutableState.update { it.copy(track = tracks.firstOrNull { track -> track.id == selectedId } ?: tracks.firstOrNull()) }
                     }
                     else if (status == 2) pause()
                     sessionId = id
@@ -76,7 +75,9 @@ class FocusAudioPlayer(
             repository.library.catch { stop(); mutableState.update { it.copy(error = "无法读取音乐列表") } }
                 .collect { library ->
                     tracks = library.tracks
-                    if (selectedId != library.selectedId || tracks.none { it.id == state.value.track?.id }) {
+                    // Remembering the current song emits a library update too; keep its player alive.
+                    if ((selectedId != library.selectedId && state.value.track?.id != library.selected?.id) ||
+                        tracks.none { it.id == state.value.track?.id }) {
                         stop()
                         mutableState.update { it.copy(track = library.selected ?: tracks.firstOrNull()) }
                     }
@@ -142,24 +143,38 @@ class FocusAudioPlayer(
     }
 
     private fun startPrepared() {
-        try {
-            if (sessionStatus != 1) { pause(); return }
-            if (manager.requestAudioFocus(focusRequest) != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
-                fail("声音正在被其他应用占用，请稍后播放")
-                return
+        val audio = player ?: return
+        val track = state.value.track ?: return
+        val request = generation
+        val previousSelection = selectedId
+        mutableState.update { it.copy(preparing = true) }
+        scope.launch {
+            try {
+                // Persist once per start, off the main thread, before advancing the playlist.
+                val saved = repository.rememberPlaying(track.id, previousSelection)
+                if (player !== audio || request != generation) return@launch
+                if (!saved || sessionStatus != 1) { stop(); return@launch }
+                selectedId = track.id
+                if (manager.requestAudioFocus(focusRequest) != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+                    fail("声音正在被其他应用占用，请稍后播放")
+                    return@launch
+                }
+                if (!noisyRegistered) {
+                    ContextCompat.registerReceiver(context, noisyReceiver,
+                        IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY), ContextCompat.RECEIVER_NOT_EXPORTED)
+                    noisyRegistered = true
+                }
+                audio.start()
+                mutableState.update { it.copy(playing = true, preparing = false, error = null) }
+            } catch (error: CancellationException) { throw error }
+            catch (error: Exception) {
+                if (player === audio && request == generation) fail("音频无法播放或保存播放曲目，请重试")
             }
-            if (!noisyRegistered) {
-                ContextCompat.registerReceiver(context, noisyReceiver,
-                    IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY), ContextCompat.RECEIVER_NOT_EXPORTED)
-                noisyRegistered = true
-            }
-            player?.start()
-            mutableState.update { it.copy(playing = true, preparing = false, error = null) }
-        } catch (error: Exception) { fail("音频无法播放，请选择其他文件") }
+        }
     }
 
     fun pause() {
-        if (!prepared) { stop(); return }
+        if (!prepared || state.value.preparing) { stop(); return }
         try { player?.pause() }
         catch (error: IllegalStateException) { stop(); return }
         abandonFocus()

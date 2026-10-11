@@ -101,6 +101,18 @@ class FocusAudioRepository(context: Context) {
         preferences[selectedKey] = id
     }
 
+    /** A late playback callback must not overwrite a newer explicit selection or import. */
+    suspend fun rememberPlaying(id: String, expectedSelectedId: String?): Boolean {
+        var saved = false
+        store.edit { preferences ->
+            if (preferences[selectedKey] == expectedSelectedId && decode(preferences[tracksKey]).any { it.id == id }) {
+                preferences[selectedKey] = id
+                saved = true
+            }
+        }
+        return saved
+    }
+
     suspend fun remove(id: String) = withContext(Dispatchers.IO) {
         lock.withLock {
             val file = ownedFile(id)

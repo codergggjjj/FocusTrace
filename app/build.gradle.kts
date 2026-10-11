@@ -11,8 +11,8 @@ android {
         applicationId = "com.focustrace"
         minSdk = 26
         targetSdk = 34
-        versionCode = 16
-        versionName = "1.0.14"
+        versionCode = 17
+        versionName = "1.0.15"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildTypes {
