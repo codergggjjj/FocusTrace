@@ -2,7 +2,7 @@
 
 记录每一次专注，也看见每一次分心。
 
-[下载 FocusTrace v1.0.16 APK](https://github.com/codergggjjj/FocusTrace/releases/download/v1.0.16/FocusTrace-v1.0.16-performance.apk) · [发布范围与说明](docs/release-v1.0.16.md)
+[下载 FocusTrace v1.0.17 APK](https://github.com/codergggjjj/FocusTrace/releases/download/v1.0.17/FocusTrace-v1.0.17-performance.apk) · [发布范围与说明](docs/release-v1.0.17.md)
 
 此版本使用 debug 签名，面向 Android 8.0 及以上，按当前已实现功能发布。
 
@@ -24,6 +24,8 @@ Windows 命令行验证：
 ```
 
 测试范围、预算与失败处理见 [分层测试规范](docs/testing.md)。默认不启动模拟器、不运行全量仪器测试。
+
+已增加可选的 [e2e 技能使用约定](docs/testing.md#e2e-技能使用约定)，用于指导少量真实 UI 流程检查；当前尚未配置其测试运行器，原有测试入口保持不变。
 
 调试 APK：`app/build/outputs/apk/debug/app-debug.apk`。发布签名和应用商店发布不属于此阶段。
 
@@ -83,6 +85,8 @@ docs/                阶段说明与验证结果
 待完成列表的排序按钮可打开“调整待办顺序”，支持上移、下移和置顶，操作后自动保存；重启或备份恢复后保留顺序。新建与自动生成的重复待办放在最上面，已完成列表继续按创建时间倒序，详见 [待办排序](docs/task-order.md)。
 
 点击待办进入编辑页后，可打开“学习详情”：查看该待办累计学习时长、专注次数、学习天数、平均单次时长、近 7/30 天趋势和全部关联记录。支持打开计时报告、补录、编辑手动记录及确认删除已结束的记录，详见 [待办学习详情](docs/task-study.md)。
+
+手动补录的开始时间支持通过小时、分钟下拉列表滑动选择，默认当前时间，并按专注时长自动计算结束时间；新增与编辑共用同一控件，详见 [手动专注记录](docs/manual-focus-records.md)。
 
 番茄钟支持关联待办或自由专注、自定义专注/休息时长、暂停继续、提前结束、休息倒计时及本轮摘要。时间锚点持久化到 Room，数据库已升级为版本 9，提供 1→2→3→4→5→6→7→8→9 迁移。
 

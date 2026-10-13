@@ -42,7 +42,9 @@ internal fun ManualRecordDialog(record: FocusSessionEntity?, tasks: LoadState<Li
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(date, { date = it.take(10) }, label = { Text("日期（yyyy-MM-dd）") }, singleLine = true, enabled = !busy)
-                OutlinedTextField(start, { start = it.take(5) }, label = { Text("开始时间（HH:mm）") }, singleLine = true, enabled = !busy)
+                ManualTimeSelector(start.take(2).toInt(), start.takeLast(2).toInt(), enabled = !busy) { hour, minute ->
+                    start = timeFormat.format(LocalTime.of(hour, minute))
+                }
                 OutlinedTextField(minutes, { minutes = it.take(5) }, label = { Text("专注时长（分钟）") }, singleLine = true, enabled = !busy,
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number))
                 androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

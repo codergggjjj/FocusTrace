@@ -30,20 +30,27 @@ class FoundationTest {
             val before = java.time.LocalDateTime.now().withSecond(0).withNano(0)
             compose.onNodeWithText("添加专注记录").performScrollTo().performClick()
             val after = java.time.LocalDateTime.now().withSecond(0).withNano(0)
-            val field = compose.onNodeWithText("开始时间（HH:mm）").fetchSemanticsNode()
-            val entered = field.config[androidx.compose.ui.semantics.SemanticsProperties.EditableText].text
+            fun selectedPart(tag: String) = compose.onNodeWithTag(tag).fetchSemanticsNode()
+                .config[androidx.compose.ui.semantics.SemanticsProperties.EditableText].text
+            val entered = selectedPart("manual-start-hour") + ":" + selectedPart("manual-start-minute")
             val format = java.time.format.DateTimeFormatter.ofPattern("HH:mm")
             assertTrue(entered == before.format(format) || entered == after.format(format))
             compose.onNodeWithText("对应任务：学习操作系统补录验证").assertExists()
-            compose.onNodeWithText("开始时间（HH:mm）").performTextReplacement("14:00")
             compose.onNodeWithText("专注时长（分钟）").performTextReplacement("120")
-            compose.onNodeWithText("结束时间（自动计算）").assertTextContains("16:00")
+            selectManualTime(23, 59)
+            compose.onNodeWithText("保存记录").assertIsNotEnabled()
+            selectManualTime(14, 35)
+            compose.onNodeWithText("结束时间（自动计算）").assertTextContains("16:35")
             compose.activityRule.scenario.recreate()
+            compose.onNodeWithTag("manual-start-hour").assertTextContains("14")
+            compose.onNodeWithTag("manual-start-minute").assertTextContains("35")
             compose.onNodeWithText("保存记录").performClick()
             compose.waitUntil(5000) { compose.onAllNodesWithText("专注时长（分钟）").fetchSemanticsNodes().isEmpty() }
             val row = runBlocking { db.focusSessionDao().getAll().first().single { it.taskId == taskId } }
             assertEquals("MANUAL", row.source)
             assertEquals(7200L, row.focusSeconds)
+            assertEquals(java.time.LocalTime.of(14, 35), java.time.Instant.ofEpochMilli(row.startTime)
+                .atZone(java.time.ZoneId.systemDefault()).toLocalTime())
             assertEquals(7200L, runBlocking { app.container.focusRepository.taskFocusSeconds(taskId).first() })
         } finally {
             runBlocking {
@@ -61,7 +68,7 @@ class FoundationTest {
             compose.onNodeWithText("查看专注记录").performClick()
             compose.onNodeWithText("手动添加记录").performClick()
             compose.onNodeWithText("日期（yyyy-MM-dd）").performTextReplacement("2024-06-12")
-            compose.onNodeWithText("开始时间（HH:mm）").performTextReplacement("14:00")
+            selectManualTime(14, 0)
             compose.onNodeWithText("专注时长（分钟）").performTextReplacement("5")
             compose.onNodeWithText("保存记录").assertIsNotEnabled()
             compose.onNodeWithText("专注时长（分钟）").performTextReplacement("120")
@@ -87,6 +94,13 @@ class FoundationTest {
         } finally {
             runBlocking { manualId?.let { db.focusSessionDao().getSession(it)?.let { row -> db.focusSessionDao().delete(row) } } }
         }
+    }
+
+    private fun selectManualTime(hour: Int, minute: Int) {
+        compose.onNodeWithTag("manual-start-hour").performClick()
+        compose.onNodeWithTag("manual-start-hour-option-$hour").performScrollTo().performClick()
+        compose.onNodeWithTag("manual-start-minute").performClick()
+        compose.onNodeWithTag("manual-start-minute-option-$minute").performScrollTo().performClick()
     }
 
     @Test fun realScreenOffDoesNotCreateDistraction() {
