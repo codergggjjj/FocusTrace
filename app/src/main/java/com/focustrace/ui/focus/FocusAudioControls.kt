@@ -34,17 +34,32 @@ internal fun FocusAudioControls(viewModel: FocusViewModel, immersive: Boolean, f
                     Text(state.playback.track?.title ?: "专注音乐", color = foreground,
                         style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     Text(when {
-                        state.playback.preparing -> "正在加载…"
+                        state.playback.switching || state.playback.preparing -> "正在加载…"
                         state.library.tracks.isEmpty() -> "在设置中批量导入音乐"
                         state.playback.playing -> "列表循环 · 共 ${state.library.tracks.size} 首"
                         else -> "已暂停 · 共 ${state.library.tracks.size} 首"
                     }, color = secondary, style = MaterialTheme.typography.bodySmall)
                 }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically) {
+                val canSwitch = focusing && state.playback.canPlay &&
+                    state.library.tracks.size > 1 && !state.playback.switching
+                IconButton(onClick = viewModel::previousAudio, enabled = canSwitch,
+                    modifier = Modifier.size(48.dp).testTag("focus-audio-previous")) {
+                    Icon(Icons.Outlined.SkipPrevious, contentDescription = "上一首",
+                        tint = if (canSwitch) foreground else secondary.copy(alpha = 0.38f))
+                }
                 FilledTonalIconButton(onClick = viewModel::toggleAudio,
-                    enabled = focusing && state.playback.canPlay && state.playback.track != null,
+                    enabled = focusing && state.playback.canPlay && state.playback.track != null && !state.playback.switching,
                     modifier = Modifier.size(48.dp).testTag("focus-audio-toggle")) {
                     Icon(if (state.playback.foregroundActive) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,
                         contentDescription = if (state.playback.foregroundActive) "暂停音乐" else "播放音乐")
+                }
+                IconButton(onClick = viewModel::nextAudio, enabled = canSwitch,
+                    modifier = Modifier.size(48.dp).testTag("focus-audio-next")) {
+                    Icon(Icons.Outlined.SkipNext, contentDescription = "下一首",
+                        tint = if (canSwitch) foreground else secondary.copy(alpha = 0.38f))
                 }
             }
             (state.message ?: state.playback.error)?.let { Text(it, color = secondary, style = MaterialTheme.typography.bodySmall) }

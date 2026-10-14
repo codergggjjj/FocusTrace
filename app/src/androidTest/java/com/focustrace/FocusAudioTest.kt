@@ -182,6 +182,46 @@ class FocusAudioTest {
         }
     }
 
+    @Test fun manualSwitchWrapsAndPreservesPlaybackState() = runBlocking<Unit> {
+        val container = app.container
+        val repository = container.focusAudioRepository
+        val previous = repository.library.first()
+        val source = makeWave(30)
+        val added = mutableListOf<com.focustrace.data.repository.FocusAudioTrack>()
+        val audio = container.focusAudioPlayer
+        try {
+            repeat(2) { added += repository.importAudio(Uri.fromFile(source)) }
+            repository.select(added.first().id)
+            container.lifecycle.awaitEvents()
+            container.pomodoro.finish()
+            container.pomodoro.startStopwatch(null)
+            withTimeout(5000) { audio.state.first { it.canPlay && it.track?.id == added.first().id } }
+            withContext(Dispatchers.Main) { audio.next() }
+            withTimeout(5000) { audio.state.first { !it.switching && it.track?.id == added.last().id } }
+            assertFalse(audio.state.value.foregroundActive)
+            assertEquals(added.last().id, FocusAudioRepository(app).library.first().selectedId)
+            withContext(Dispatchers.Main) { audio.play() }
+            withTimeout(5000) { audio.state.first { it.playing } }
+            withContext(Dispatchers.Main) { audio.next() }
+            val firstId = repository.library.first().tracks.first().id
+            withTimeout(5000) { audio.state.first { it.playing && it.track?.id == firstId } }
+            withContext(Dispatchers.Main) { audio.previous() }
+            withTimeout(5000) { audio.state.first { it.playing && it.track?.id == added.last().id } }
+            assertEquals(1, container.database.focusSessionDao().latest()?.status)
+            container.pomodoro.pause()
+            withTimeout(5000) { audio.state.first { !it.canPlay && !it.foregroundActive } }
+            withContext(Dispatchers.Main) { audio.next() }
+            assertEquals(added.last().id, audio.state.value.track?.id)
+        } finally {
+            container.pomodoro.finish()
+            withContext(Dispatchers.Main) { audio.stop() }
+            app.stopService(Intent(app, FocusTimerService::class.java))
+            added.forEach { repository.remove(it.id) }
+            previous.selectedId?.let { repository.select(it) }
+            source.delete()
+        }
+    }
+
     private fun makeWave(seconds: Int = 10): File {
         val samples = 8_000 * seconds
         val buffer = ByteBuffer.allocate(44 + samples * 2).order(ByteOrder.LITTLE_ENDIAN)

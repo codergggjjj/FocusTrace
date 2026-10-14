@@ -24,6 +24,8 @@ class FocusViewModel(private val container: AppContainer) : ViewModel() {
     }.catch { emit(FocusAudioUiState(message = "无法读取音乐列表，请重试")) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), FocusAudioUiState())
     fun toggleAudio() = container.focusAudioPlayer.toggle()
+    fun previousAudio() = container.focusAudioPlayer.previous()
+    fun nextAudio() = container.focusAudioPlayer.next()
     init {
         viewModelScope.launch {
             uiState.map { state ->

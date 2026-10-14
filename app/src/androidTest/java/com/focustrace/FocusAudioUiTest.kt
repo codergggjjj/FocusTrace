@@ -48,6 +48,8 @@ class FocusAudioUiTest {
             }
             compose.waitUntil(5000) { compose.onAllNodesWithText("正在专注").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("focus-audio-toggle").performScrollTo().assertIsDisplayed()
+            compose.onNodeWithTag("focus-audio-previous").assertIsDisplayed()
+            compose.onNodeWithTag("focus-audio-next").assertIsDisplayed()
             compose.onNodeWithText("一次只做一件事").assertDoesNotExist()
             compose.onNodeWithTag("focus-audio-import").assertDoesNotExist()
         } finally { runBlocking { container.pomodoro.finish() } }

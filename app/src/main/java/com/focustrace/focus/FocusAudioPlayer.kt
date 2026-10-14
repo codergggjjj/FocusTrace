@@ -19,7 +19,8 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
 data class FocusAudioPlayback(val track: FocusAudioTrack? = null, val playing: Boolean = false,
-    val preparing: Boolean = false, val canPlay: Boolean = false, val error: String? = null) {
+    val preparing: Boolean = false, val canPlay: Boolean = false, val error: String? = null,
+    val switching: Boolean = false) {
     val foregroundActive: Boolean get() = playing || preparing
 }
 
@@ -87,10 +88,41 @@ class FocusAudioPlayer(
     }
 
     fun toggle() {
+        if (state.value.switching) return
         if (state.value.foregroundActive) pause() else play()
     }
 
+    fun previous() = skip(-1)
+
+    fun next() = skip(1)
+
+    private fun skip(direction: Int) {
+        if (sessionStatus != 1 || tracks.size < 2 || state.value.switching) return
+        val index = tracks.indexOfFirst { it.id == state.value.track?.id }
+        if (index < 0) return
+        val next = tracks[(index + direction + tracks.size) % tracks.size]
+        val resume = state.value.foregroundActive
+        val previousSelection = selectedId
+        stop()
+        val request = generation
+        mutableState.update { it.copy(track = next, switching = true) }
+        scope.launch {
+            try {
+                val saved = repository.rememberPlaying(next.id, previousSelection)
+                if (request != generation) return@launch
+                if (!saved) { stop(); return@launch }
+                selectedId = next.id
+                mutableState.update { it.copy(switching = false) }
+                if (resume && sessionStatus == 1) play()
+            } catch (error: CancellationException) { throw error }
+            catch (error: Exception) {
+                if (request == generation) fail("无法切换音乐，请重试")
+            }
+        }
+    }
+
     fun play() {
+        if (state.value.switching) return
         if (sessionStatus != 1) {
             mutableState.update { it.copy(error = "请先继续专注，再播放音乐") }
             return
@@ -188,7 +220,7 @@ class FocusAudioPlayer(
         prepared = false
         previous?.release()
         abandonFocus()
-        mutableState.update { it.copy(playing = false, preparing = false, error = null) }
+        mutableState.update { it.copy(playing = false, preparing = false, switching = false, error = null) }
     }
 
     private fun abandonFocus() {
