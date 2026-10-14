@@ -2,7 +2,7 @@
 
 记录每一次专注，也看见每一次分心。
 
-[下载 FocusTrace v1.0.18 APK](https://github.com/codergggjjj/FocusTrace/releases/download/v1.0.18/FocusTrace-v1.0.18-performance.apk) · [发布范围与说明](docs/release-v1.0.18.md)
+[下载 FocusTrace v1.0.19 APK](https://github.com/codergggjjj/FocusTrace/releases/download/v1.0.19/FocusTrace-v1.0.19-performance.apk) · [发布范围与说明](docs/release-v1.0.19.md)
 
 此版本使用 debug 签名，面向 Android 8.0 及以上，按当前已实现功能发布。
 
@@ -111,6 +111,8 @@ docs/                阶段说明与验证结果
 “我的 → 学习目标”可独立设置每日、每周目标，也可在统计页的学习目标卡片直接设置。支持输入分钟数、快捷时长及分别关闭，默认未开启；统计页展示今日和本周全部待办的有效学习时长、进度、剩余时长和达标状态。目标设置随本地备份保存，详见 [学习目标](docs/learning-goals.md)。
 
 “我的 → 备份与恢复”支持将待办、专注记录、分心事件、设置和自定义背景图导出到用户选择的本地文件，也可在预览内容后确认替换并恢复。正在计时或休息时不可操作；备份文件未加密，请自行保管。详见 [本地备份说明](docs/local-backup.md)。
+
+“我的 → 应用更新”显示当前安装版本，可打开 GitHub 最新发布页查看更新说明并下载 APK。下载后使用相同签名的安装包覆盖更新以保留数据；这是手动更新入口，不自动检查版本或下载安装包，详见 [应用更新入口](docs/app-updates.md)。
 
 待办支持每天、工作日或指定星期重复。打开待办页时生成当天任务，同日防重、不补建错过日期；关闭原待办重复规则可停止后续生成。详见 [重复待办](docs/repeating-tasks.md)。
 

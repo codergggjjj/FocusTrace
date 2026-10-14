@@ -119,6 +119,10 @@ fun ProfileScreen(viewModel: SettingsViewModel, musicViewModel: MusicLibraryView
             }
             if (!editing) error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         }
+        Column {
+            SettingsSection("应用")
+            AppUpdateEntry()
+        }
         Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 8.dp)) {
             Text("FocusTrace · 专迹", style = MaterialTheme.typography.titleMedium)
             Text("记录每一次专注，也看见每一次分心。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -138,8 +142,9 @@ private fun SettingsDivider() {
 }
 
 @Composable
-private fun SettingRow(icon: ImageVector, title: String, value: String, enabled: Boolean, onClick: () -> Unit) {
-    ListItem(modifier = Modifier.clickable(enabled = enabled, onClick = onClick),
+internal fun SettingRow(icon: ImageVector, title: String, value: String, enabled: Boolean,
+    modifier: Modifier = Modifier, onClick: () -> Unit) {
+    ListItem(modifier = modifier.clickable(enabled = enabled, onClick = onClick),
         colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
         headlineContent = { Text(title, style = MaterialTheme.typography.bodyLarge) },
         supportingContent = { Text(value, style = MaterialTheme.typography.bodySmall) },
