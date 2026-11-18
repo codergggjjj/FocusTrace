@@ -14,6 +14,7 @@ import android.view.Display
 /** App-owned receiver combines process visibility with screen/keyguard state. */
 class ScreenFocusMonitor(private val context: Context, private val transition: (Boolean, Boolean) -> Unit) {
     private var foreground = true
+    private var screenOffReported = false
     private val power = context.getSystemService(PowerManager::class.java)
     private val keyguard = context.getSystemService(KeyguardManager::class.java)
     private val displays = context.getSystemService(DisplayManager::class.java)
@@ -27,7 +28,12 @@ class ScreenFocusMonitor(private val context: Context, private val transition: (
     }
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            publish(intent.action == Intent.ACTION_SCREEN_OFF)
+            when (intent.action) {
+                Intent.ACTION_SCREEN_OFF -> screenOffReported = true
+                Intent.ACTION_SCREEN_ON, Intent.ACTION_USER_PRESENT -> screenOffReported = false
+                else -> return
+            }
+            publish()
         }
     }
     fun register() {
@@ -45,13 +51,15 @@ class ScreenFocusMonitor(private val context: Context, private val transition: (
     fun onForeground() { foreground = true; publish() }
     /** Called by the existing foreground-service tick as a broadcast fallback. */
     fun checkState() = publish()
-    private fun publish(screenOff: Boolean = false) {
+    // A resumed timer needs the current state even if visibility has not changed.
+    fun syncAfterResume() = publish(force = true)
+    private fun publish(force: Boolean = false) {
         val displayState = displays.getDisplay(Display.DEFAULT_DISPLAY)?.state
         val displayAsleep = displayState == Display.STATE_OFF || displayState == Display.STATE_DOZE ||
             displayState == Display.STATE_DOZE_SUSPEND
-        val state = foreground to (screenOff || displayAsleep || !power.isInteractive || keyguard.isKeyguardLocked)
+        val state = foreground to (screenOffReported || displayAsleep || !power.isInteractive || keyguard.isKeyguardLocked)
         // Repeated service ticks/display notifications must not enqueue DB work.
-        if (state != lastState) {
+        if (force || state != lastState) {
             lastState = state
             transition(state.first, state.second)
         }

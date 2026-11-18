@@ -164,11 +164,11 @@ private fun TodayOverview(pending: Int, completed: Int, focusSeconds: Long) {
     Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(TodoCardRadius),
         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = .58f)) {
         Column(Modifier.padding(horizontal = 18.dp, vertical = 15.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("今日概览", style = MaterialTheme.typography.labelLarge,
+            Text("待办概览", style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onPrimaryContainer)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OverviewItem("$pending", "待完成", Modifier.weight(1f))
-                OverviewItem("$completed", "已完成", Modifier.weight(1f))
+                OverviewItem("$completed", "累计已完成", Modifier.weight(1f))
                 OverviewItem(compactTodayDuration(focusSeconds), "今日专注", Modifier.weight(1.25f), emphasized = true)
             }
         }

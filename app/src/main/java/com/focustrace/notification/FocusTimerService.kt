@@ -14,14 +14,10 @@ import android.media.AudioAttributes
 import android.media.RingtoneManager
 import android.os.Build
 import android.os.IBinder
-import android.app.KeyguardManager
-import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.ProcessLifecycleOwner
 import com.focustrace.FocusTraceApplication
 import com.focustrace.MainActivity
 import com.focustrace.R
@@ -76,12 +72,8 @@ class FocusTimerService : Service() {
             ACTION_RESUME -> performAction {
                 container.lifecycle.awaitEvents()
                 container.pomodoro.resume()
-                if (!ProcessLifecycleOwner.get().lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
-                    val power = getSystemService(PowerManager::class.java)
-                    val keyguard = getSystemService(KeyguardManager::class.java)
-                    container.lifecycle.transition(false, !power.isInteractive || keyguard.isKeyguardLocked)
-                    container.lifecycle.awaitEvents()
-                }
+                container.screenFocusMonitor.syncAfterResume()
+                container.lifecycle.awaitEvents()
                 refreshAndPublish(allowCompletion = false)
             }
             ACTION_FINISH -> performAction {

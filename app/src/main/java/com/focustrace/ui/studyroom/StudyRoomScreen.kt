@@ -23,6 +23,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -45,6 +51,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+private val RoomSearchTime = DateTimeFormatter.ofPattern("HH:mm:ss")
 private val RoomNumerals = FontFamily(Font(R.font.barlow_semicondensed_medium, FontWeight.Medium))
 
 private const val SHARE_NOTICE = "同一 Wi-Fi 的用户可直接加入，并看到你的昵称、头像、当前任务、专注状态和今日累计时长。"
@@ -62,60 +69,95 @@ internal fun StudyRoomScreen(viewModel: StudyRoomViewModel, onFocus: () -> Unit)
     var editProfile by rememberSaveable { mutableStateOf(false) }
     var picking by rememberSaveable { mutableStateOf(false) }
     var joinKey by rememberSaveable { mutableStateOf<String?>(null) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val savedRoom by viewModel.savedRoom.collectAsStateWithLifecycle()
+    val lastInvite by viewModel.lastInvite.collectAsStateWithLifecycle()
+    val invitation by viewModel.invitation.collectAsStateWithLifecycle()
+    var enteringInvite by rememberSaveable { mutableStateOf(false) }
+    var inviteText by rememberSaveable { mutableStateOf("") }
+    var forgetGuest by rememberSaveable { mutableStateOf(false) }
+    var forgetRoom by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(viewModel) {
+        if (viewModel.state.value == StudyRoomState.Lobby && viewModel.savedRoom.value != null) viewModel.restoreHost()
+    }
     var close by rememberSaveable { mutableStateOf(false) }
     var sharingAccepted by rememberSaveable { mutableStateOf(false) }
     val lobby = state == StudyRoomState.Lobby
-    val owner = LocalLifecycleOwner.current
-    LaunchedEffect(lobby, owner, viewModel) {
-        if (lobby) owner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { viewModel.browse() }
-    }
     fun openFocus(taskId: Long?) = viewModel.start(taskId) { picking = false; onFocus() }
 
     when (val room = state) {
         StudyRoomState.Lobby -> {
-            LazyColumn(Modifier.fillMaxSize().testTag("study-room-lobby"),
-                contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                item {
-                    Text("自习室", style = MaterialTheme.typography.headlineLarge)
-                    Spacer(Modifier.height(4.dp))
-                    Text("同一 Wi-Fi，一起专注", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            val pull = rememberPullToRefreshState()
+            val owner = LocalLifecycleOwner.current
+            var searchRequest by remember { mutableIntStateOf(0) }
+            LaunchedEffect(pull.isRefreshing) {
+                if (pull.isRefreshing) searchRequest++
+            }
+            LaunchedEffect(owner, viewModel, searchRequest) {
+                owner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    viewModel.browse { pull.endRefresh() }
                 }
-                item {
-                    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
-                        Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Avatar(profile, 44)
-                            Text(profile.nickname, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium,
-                                maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            TextButton(onClick = { editProfile = true }) { Text("编辑资料") }
+            }
+            Box(Modifier.fillMaxSize().nestedScroll(pull.nestedScrollConnection)) {
+                LazyColumn(Modifier.fillMaxSize().testTag("study-room-lobby"),
+                    contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    item {
+                        Text("自习室", style = MaterialTheme.typography.headlineLarge)
+                        Spacer(Modifier.height(4.dp))
+                        Text("同一 Wi-Fi，一起专注", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    item {
+                        Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+                            Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Avatar(profile, 44)
+                                Text(profile.nickname, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium,
+                                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                TextButton(onClick = { editProfile = true }) { Text("编辑资料") }
+                            }
+                        }
+                    }
+                    item {
+                        Button(onClick = { if (savedRoom != null) viewModel.restoreHost() else create = true }, enabled = discovery.wifiAvailable,
+                            modifier = Modifier.fillMaxWidth().testTag("study-room-create")) { Text(savedRoom?.let { "重新进入「$it」" } ?: "创建自习室") }
+                    }
+                    item {
+                        Row {
+                            TextButton(onClick = { inviteText = ""; enteringInvite = true }) { Text("通过邀请加入") }
+                            if (lastInvite != null) {
+                                TextButton(enabled = discovery.wifiAvailable, onClick = viewModel::returnToRoom) { Text("重返上次房间") }
+                                TextButton(onClick = { forgetGuest = true }) { Text("忘记房间") }
+                            }
+                            if (savedRoom != null) TextButton(onClick = { forgetRoom = true }) { Text("解散我的房间") }
+                        }
+                    }
+                    item {
+                        Text("附近的自习室", style = MaterialTheme.typography.titleMedium)
+                        val started = remember(discovery.startedAt) { discovery.startedAt?.let {
+                            Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).format(RoomSearchTime)
+                        } }
+                        Text(
+                            when {
+                                !discovery.wifiAvailable -> "连接 Wi-Fi 后即可发现附近的房间。"
+                                discovery.failed -> "暂时无法搜索房间，正在重试。"
+                                started == null -> "正在启动搜索…"
+                                else -> "${started} 开始搜索 · ${if (discovery.rooms.isEmpty()) "暂未发现房间" else "发现 ${discovery.rooms.size} 个房间"} · 下拉刷新"
+                            }, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(top = 6.dp))
+                    }
+                    items(discovery.rooms, key = { it.key }) { listing ->
+                        OutlinedCard(Modifier.fillMaxWidth()) {
+                            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Outlined.Groups, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                Text(listing.name, Modifier.weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                TextButton(onClick = { if (sharingAccepted) viewModel.join(listing) else joinKey = listing.key }) { Text("加入") }
+                            }
                         }
                     }
                 }
-                item {
-                    Button(onClick = { create = true }, enabled = discovery.wifiAvailable,
-                        modifier = Modifier.fillMaxWidth().testTag("study-room-create")) { Text("创建自习室") }
-                }
-                item {
-                    Text("附近的自习室", style = MaterialTheme.typography.titleMedium)
-                    if (discovery.rooms.isEmpty()) Text(
-                        when {
-                            !discovery.wifiAvailable -> "连接 Wi-Fi 后即可发现附近的房间。"
-                            discovery.failed -> "暂时无法搜索房间，正在重试。"
-                            else -> "暂未发现房间。可以自己创建，或确认双方连接同一 Wi-Fi。"
-                        }, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(top = 6.dp))
-                }
-                items(discovery.rooms, key = { it.key }) { listing ->
-                    OutlinedCard(Modifier.fillMaxWidth()) {
-                        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Outlined.Groups, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                            Text(listing.name, Modifier.weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            TextButton(onClick = { if (sharingAccepted) viewModel.join(listing) else joinKey = listing.key }) { Text("加入") }
-                        }
-                    }
-                }
+                PullToRefreshContainer(state = pull, modifier = Modifier.align(Alignment.TopCenter))
             }
         }
         is StudyRoomState.Connecting -> {
@@ -137,6 +179,13 @@ internal fun StudyRoomScreen(viewModel: StudyRoomViewModel, onFocus: () -> Unit)
                     Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text("${roster.members.size} / $ROOM_CAPACITY 人在房间", Modifier.weight(1f),
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (roster.isHost) invitation?.let { link ->
+                            TextButton(onClick = {
+                                val share = android.content.Intent(android.content.Intent.ACTION_SEND)
+                                    .setType("text/plain").putExtra(android.content.Intent.EXTRA_TEXT, link)
+                                context.startActivity(android.content.Intent.createChooser(share, "邀请加入自习室"))
+                            }) { Text("邀请") }
+                        }
                         TextButton(onClick = { close = true }, modifier = Modifier.testTag("study-room-leave")) {
                             Text(if (roster.isHost) "关闭自习室" else "离开自习室")
                         }
@@ -157,6 +206,27 @@ internal fun StudyRoomScreen(viewModel: StudyRoomViewModel, onFocus: () -> Unit)
         }
     }
 
+    if (forgetGuest && lobby) AlertDialog(onDismissRequest = { forgetGuest = false },
+        title = { Text("忘记上次加入的房间？") }, text = { Text("只移除本机保存的邀请，以后仍可通过新邀请加入。") },
+        confirmButton = { TextButton(onClick = { viewModel.forgetGuest(); forgetGuest = false }) { Text("忘记") } },
+        dismissButton = { TextButton(onClick = { forgetGuest = false }) { Text("取消") } })
+    if (forgetRoom && lobby) AlertDialog(onDismissRequest = { forgetRoom = false },
+        title = { Text("解散已保存的自习室？") }, text = { Text("旧邀请将失效。") },
+        confirmButton = { TextButton(onClick = { viewModel.forgetHost(); forgetRoom = false }) { Text("解散") } },
+        dismissButton = { TextButton(onClick = { forgetRoom = false }) { Text("取消") } })
+    if (enteringInvite && lobby) {
+        val valid = RoomInvite.parse(inviteText) != null
+        AlertDialog(onDismissRequest = { enteringInvite = false }, title = { Text("通过邀请加入") },
+            text = { Column {
+                OutlinedTextField(inviteText, { inviteText = it.take(256) }, singleLine = true,
+                    label = { Text("粘贴房主分享的邀请") }, isError = inviteText.isNotBlank() && !valid)
+                Text(if (inviteText.isNotBlank() && !valid) "邀请格式不正确，请粘贴完整邀请。" else SHARE_NOTICE)
+            } },
+            confirmButton = { TextButton(enabled = valid && discovery.wifiAvailable, onClick = {
+                enteringInvite = false; viewModel.joinInvite(inviteText)
+            }) { Text("加入") } },
+            dismissButton = { TextButton(onClick = { enteringInvite = false }) { Text("取消") } })
+    }
     if (create && lobby) RoomNameDialog(profile.nickname, onDismiss = { create = false }) { name ->
         sharingAccepted = true; create = false; viewModel.create(name)
     }

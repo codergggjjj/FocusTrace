@@ -29,9 +29,17 @@ internal class StudyRoomViewModel(private val container: AppContainer) : ViewMod
     val starting = MutableStateFlow(false)
     val startError = MutableStateFlow<String?>(null)
 
-    suspend fun browse() = room.browse()
+    suspend fun browse(onSearchReady: () -> Unit) = room.browse(onSearchReady)
     fun create(name: String) = room.create(name)
     fun join(listing: RoomListing) = room.join(listing)
+    val savedRoom = room.savedName
+    val lastInvite = room.lastInvite
+    val invitation = room.invitation
+    fun joinInvite(text: String) = room.joinInvite(text)
+    fun returnToRoom() = room.returnToRoom()
+    fun forgetGuest() = room.forgetGuest()
+    fun restoreHost() = room.restoreHost()
+    fun forgetHost() = room.forgetHost()
     fun leave() = room.requestStop()
     suspend fun importAvatar(uri: Uri) = room.profile.import(uri)
     suspend fun saveProfile(nickname: String, avatar: String) = room.profile.save(nickname, avatar)

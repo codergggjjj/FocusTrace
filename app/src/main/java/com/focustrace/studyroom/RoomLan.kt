@@ -30,9 +30,23 @@ internal fun isRoomPeerAddress(local: Inet4Address, remote: InetAddress, prefixL
     return (localIp and mask) == (remoteIp and mask)
 }
 
+internal data class RoomEndpoint(val address: Inet4Address, val port: Int, val pin: String)
+internal suspend fun <T> openRoomEndpoint(
+    original: RoomEndpoint, returning: Boolean, discover: suspend (String) -> RoomEndpoint?,
+    open: suspend (RoomEndpoint) -> T
+): Pair<RoomEndpoint, T> {
+    try { return original to open(original) } catch (failure: IOException) {
+        currentCoroutineContext().ensureActive()
+        if (!returning) throw failure
+    }
+    val fresh = discover(original.pin)?.takeIf { it.pin == original.pin }
+        ?: throw IOException("暂未找到上次的房间。可稍后重试、粘贴新邀请或忘记此房间")
+    return fresh to open(fresh)
+}
+
 internal data class RoomListing(val key: String, val name: String, val info: NsdServiceInfo)
 internal data class RoomDiscovery(val wifiAvailable: Boolean = false, val rooms: List<RoomListing> = emptyList(),
-    val failed: Boolean = false)
+    val failed: Boolean = false, val startedAt: Long? = null)
 
 internal class RoomLan(context: Context) {
     private val connectivity = context.getSystemService(ConnectivityManager::class.java)
@@ -53,6 +67,8 @@ internal class RoomLan(context: Context) {
     }
 
     suspend fun browse(publish: (RoomDiscovery) -> Unit) {
+        var firstCheck = true
+        var startedAt: Long? = null
         var current: RoomWifi? = null
         var listener: NsdManager.DiscoveryListener? = null
         val discovered = linkedMapOf<String, RoomListing>()
@@ -67,13 +83,20 @@ internal class RoomLan(context: Context) {
         try {
             while (currentCoroutineContext().isActive) {
                 val wifi = wifi()
-                if (wifi != current || (wifi != null && listener == null)) {
+                if (firstCheck || wifi != current || (wifi != null && listener == null)) {
                     stop()
+                    firstCheck = false
+                    startedAt = null
                     current = wifi
                     publish(RoomDiscovery(wifiAvailable = wifi != null))
                     if (wifi != null) {
                         val search = object : NsdManager.DiscoveryListener {
-                            override fun onDiscoveryStarted(type: String) = Unit
+                            override fun onDiscoveryStarted(type: String) = main.execute {
+                                if (listener === this) {
+                                    startedAt = System.currentTimeMillis()
+                                    publish(RoomDiscovery(true, discovered.values.toList(), startedAt = startedAt))
+                                }
+                            }
                             override fun onDiscoveryStopped(type: String) = Unit
                             override fun onStartDiscoveryFailed(type: String, code: Int) = failed()
                             override fun onStopDiscoveryFailed(type: String, code: Int) = failed()
@@ -87,13 +110,13 @@ internal class RoomLan(context: Context) {
                                 if (listener === this && discovered.size < 100 &&
                                     (Build.VERSION.SDK_INT < 33 || service.network == null || service.network == wifi.network)) {
                                     val id = key(service)
-                                    discovered[id] = RoomListing(id, service.serviceName, service)
-                                    publish(RoomDiscovery(true, discovered.values.toList()))
+                                    discovered[id] = RoomListing(id, service.serviceName.substringAfter(' ', service.serviceName), service)
+                                    publish(RoomDiscovery(true, discovered.values.toList(), startedAt = startedAt))
                                 }
                             }
                             override fun onServiceLost(service: NsdServiceInfo) = main.execute {
                                 if (listener === this && discovered.remove(key(service)) != null) {
-                                    publish(RoomDiscovery(true, discovered.values.toList()))
+                                    publish(RoomDiscovery(true, discovered.values.toList(), startedAt = startedAt))
                                 }
                             }
                         }
@@ -115,12 +138,13 @@ internal class RoomLan(context: Context) {
         }
     }
 
-    suspend fun advertise(wifi: RoomWifi, name: String, boundPort: Int, onRegistered: (String) -> Unit) {
+    suspend fun advertise(wifi: RoomWifi, name: String, boundPort: Int, pin: String, onRegistered: (String) -> Unit) {
         val ready = CompletableDeferred<String>()
         val info = NsdServiceInfo().apply {
-            serviceName = name
+            serviceName = "FT-${pin.take(16)} " + name.take(12)
             serviceType = ROOM_SERVICE_TYPE
             setPort(boundPort)
+            setAttribute("pin", pin)
             setAttribute(VERSION_ATTRIBUTE, RoomWire.VERSION.toString())
             if (Build.VERSION.SDK_INT >= 33) network = wifi.network
         }
@@ -142,8 +166,20 @@ internal class RoomLan(context: Context) {
         }
     }
 
+    suspend fun rediscover(pin: String, wifi: RoomWifi): RoomEndpoint? = withTimeoutOrNull(10_000) {
+        coroutineScope {
+            val found = CompletableDeferred<RoomListing>()
+            val search = launch {
+                browse { result -> result.rooms.firstOrNull {
+                    it.info.serviceName.startsWith("FT-${pin.take(16)} ")
+                }?.let(found::complete) }
+            }
+            try { resolve(found.await(), wifi).takeIf { it.pin == pin } } finally { search.cancel() }
+        }
+    }
+
     @Suppress("DEPRECATION")
-    suspend fun resolve(listing: RoomListing, wifi: RoomWifi): Pair<Inet4Address, Int> {
+    suspend fun resolve(listing: RoomListing, wifi: RoomWifi): RoomEndpoint {
         val resolved = CompletableDeferred<NsdServiceInfo>()
         val listener = object : NsdManager.ResolveListener {
             override fun onResolveFailed(service: NsdServiceInfo, code: Int) {
@@ -163,7 +199,9 @@ internal class RoomLan(context: Context) {
             val address = (if (Build.VERSION.SDK_INT >= 34) info.hostAddresses.firstOrNull(wifi::contains) else info.host)
                 as? Inet4Address ?: throw IOException("找不到同一 Wi-Fi 上的房主地址")
             if (!wifi.contains(address) || info.port !in 1..65535) throw IOException("只能加入同一 Wi-Fi 的自习室")
-            return address to info.port
+            val pin = info.attributes["pin"]?.decodeToString().orEmpty()
+            if (!pin.matches(Regex("[0-9a-f]{64}"))) throw IOException("房间缺少身份信息，请双方更新应用")
+            return RoomEndpoint(address, info.port, pin)
         } finally {
             if (Build.VERSION.SDK_INT >= 34 && !resolved.isCompleted) runCatching { nsd.stopServiceResolution(listener) }
         }

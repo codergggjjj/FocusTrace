@@ -14,21 +14,27 @@ import com.focustrace.ui.components.LoadState
 import java.time.*
 import java.time.format.DateTimeFormatter
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ManualRecordDialog(record: FocusSessionEntity?, tasks: LoadState<List<TaskEntity>>,
     busy: Boolean, error: String?, onDismiss: () -> Unit,
     onSave: (String, String, String, Long?, String) -> Unit, onDelete: () -> Unit,
-    defaultTaskId: Long? = null) {
+    defaultTaskId: Long? = null, defaultDate: LocalDate? = null) {
     val zone = remember { ZoneId.systemDefault() }
     val timeFormat = remember { DateTimeFormatter.ofPattern("HH:mm") }
     val openedAt = rememberSaveable { System.currentTimeMillis() }
-    var date by rememberSaveable(record?.id) { mutableStateOf(Instant.ofEpochMilli(record?.startTime ?: openedAt).atZone(zone).toLocalDate().toString()) }
+    val today = Instant.ofEpochMilli(openedAt).atZone(zone).toLocalDate()
+    var date by rememberSaveable(record?.id) {
+        mutableStateOf((record?.let { Instant.ofEpochMilli(it.startTime).atZone(zone).toLocalDate() }
+            ?: defaultDate ?: today).toString())
+    }
     var start by rememberSaveable(record?.id) { mutableStateOf(timeFormat.format(Instant.ofEpochMilli(record?.startTime ?: openedAt).atZone(zone))) }
     var minutes by rememberSaveable(record?.id) { mutableStateOf(record?.let { (it.focusSeconds / 60).toString() } ?: "") }
     var taskId by rememberSaveable(record?.id) { mutableStateOf(record?.taskId ?: defaultTaskId) }
     var note by rememberSaveable(record?.id) { mutableStateOf(record?.note.orEmpty()) }
     var choosingTask by rememberSaveable { mutableStateOf(false) }
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
+    var pickingDate by rememberSaveable { mutableStateOf(false) }
     val endResult = remember(start, minutes) { runCatching { manualEndTime(start, minutes) } }
     val end = endResult.getOrNull().orEmpty()
     val parsed = remember(date, start, minutes, zone) { runCatching {
@@ -41,7 +47,12 @@ internal fun ManualRecordDialog(record: FocusSessionEntity?, tasks: LoadState<Li
         title = { Text(if (record == null) "添加专注记录" else "编辑专注记录") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(date, { date = it.take(10) }, label = { Text("日期（yyyy-MM-dd）") }, singleLine = true, enabled = !busy)
+                Text("日期 · $date", style = MaterialTheme.typography.labelLarge)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FilterChip(date == today.toString(), { date = today.toString() }, { Text("今天") }, enabled = !busy)
+                    FilterChip(date == today.minusDays(1).toString(), { date = today.minusDays(1).toString() }, { Text("昨天") }, enabled = !busy)
+                    TextButton(onClick = { pickingDate = true }, enabled = !busy) { Text("选择日期") }
+                }
                 ManualTimeSelector(start.take(2).toInt(), start.takeLast(2).toInt(), enabled = !busy) { hour, minute ->
                     start = timeFormat.format(LocalTime.of(hour, minute))
                 }
@@ -57,7 +68,8 @@ internal fun ManualRecordDialog(record: FocusSessionEntity?, tasks: LoadState<Li
                 parsed.getOrNull()?.let {
                     Text("$start - $end")
                     Text("专注时长：" + formatDuration(it.seconds), color = MaterialTheme.colorScheme.primary)
-                } ?: Text(parsed.exceptionOrNull()?.message.orEmpty(), color = MaterialTheme.colorScheme.error)
+                } ?: if (minutes.isEmpty()) Text("选择或输入专注时长", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                else Text(parsed.exceptionOrNull()?.message.orEmpty(), color = MaterialTheme.colorScheme.error)
                 OutlinedButton(onClick = { choosingTask = true }, enabled = !busy && tasks is LoadState.Ready) {
                     Text("对应任务：" + (taskList.firstOrNull { it.id == taskId }?.title ?: if (taskId == null) "不关联任务" else "原任务不可用"))
                 }
@@ -71,6 +83,17 @@ internal fun ManualRecordDialog(record: FocusSessionEntity?, tasks: LoadState<Li
         confirmButton = { Button(enabled = !busy && parsed.isSuccess,
             onClick = { onSave(date, start, end, taskId, note) }) { Text(if (busy) "保存中…" else "保存记录") } },
         dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text("取消") } })
+    if (pickingDate) {
+        val picker = rememberDatePickerState(initialSelectedDateMillis = LocalDate.parse(date)
+            .atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli())
+        DatePickerDialog(onDismissRequest = { pickingDate = false },
+            confirmButton = { TextButton(enabled = picker.selectedDateMillis != null, onClick = {
+                picker.selectedDateMillis?.let { date = Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate().toString() }
+                pickingDate = false
+            }) { Text("确定") } },
+            dismissButton = { TextButton(onClick = { pickingDate = false }) { Text("取消") } }
+        ) { DatePicker(state = picker) }
+    }
     if (choosingTask) AlertDialog(onDismissRequest = { choosingTask = false }, title = { Text("选择任务") },
         text = {
             androidx.compose.foundation.lazy.LazyColumn(Modifier.heightIn(max = 320.dp)) {

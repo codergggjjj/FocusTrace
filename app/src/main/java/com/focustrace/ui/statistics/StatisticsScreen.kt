@@ -73,7 +73,9 @@ fun StatisticsScreen(viewModel: StatisticsViewModel, onReport: (Long) -> Unit) {
             onConfirm = { viewModel.deleteRecord(record.id) { deletingId = null } })
     }
     if (editorOpen && (editingId == null || editedRecord != null)) ManualRecordDialog(
-        editedRecord, tasks, busy, editError, onDismiss = { editorOpen = false },
+        editedRecord, tasks, busy, editError,
+        defaultDate = selection.range.start.takeIf { selection.period == StatisticsPeriod.DAY },
+        onDismiss = { editorOpen = false },
         onSave = { date, start, end, task, note ->
             viewModel.saveManual(editingId, date, start, end, task, note) { editorOpen = false }
         }, onDelete = { editingId?.let { viewModel.deleteManual(it) { editorOpen = false; editingId = null } } })

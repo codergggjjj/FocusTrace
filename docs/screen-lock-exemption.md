@@ -23,3 +23,5 @@
   - `FoundationTest.naturalCompletionOpensReportAndKeepsRestRunning` 使用 8 秒专注期待报告，同时出现 Compose 页面定位错误。
   - `FoundationTest.todoStartsStopwatchDirectlyAndProtectsPausedSession`、`todoStartsPomodoroDirectlyAndProtectsPausedSession`、`reportDisplaysPersistedMetricsAndSurvivesRecreation` 出现 UI 定位/等待失败。
   - `FoundationTest.realScreenOffDoesNotCreateDistraction`、`LifecycleIntegrationTest.sleepingInAnotherAppCountsOnlyUnlockedAbsenceAsDistraction`、`actualHomeReturnRecordsOnlyWhileFocusing`、`NotificationTest.ongoingNotificationSupportsPauseResumeAndFinish`、`naturalPomodoroCompletionPostsCompletionNotification`、`ScreenFocusMonitorTest.screenOffOutsideAppIsDetectedEvenWhenScreenBroadcastIsMissing` 出现 UiAutomation 重复注册或连接错误；后五项所属类单独复核均通过。
+
+收到息屏广播后，后台计时刷新与通知栏继续计时均保留豁免；收到亮屏或解锁信号后重新核对屏幕和锁屏状态。

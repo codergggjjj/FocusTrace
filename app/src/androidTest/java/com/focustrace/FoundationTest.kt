@@ -20,6 +20,18 @@ import org.junit.runner.RunWith
 class FoundationTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
 
+    @Test fun manualRecordDefaultsToSelectedStatisticsDay() {
+        compose.onAllNodesWithText("统计").onFirst().performClick()
+        compose.onNodeWithText("日").performClick()
+        compose.onNodeWithContentDescription("上一日").performClick()
+        val day = compose.onNodeWithTag("statistics-range").fetchSemanticsNode()
+            .config[androidx.compose.ui.semantics.SemanticsProperties.Text].single().text
+        assertNotEquals(java.time.LocalDate.now().toString(), day)
+        compose.onNodeWithTag("statistics-list").performScrollToNode(hasText("手动补录"))
+        compose.onNodeWithText("手动补录").performClick()
+        compose.onNodeWithText("日期 · $day").assertExists()
+    }
+
     @Test fun todoEditorPrefillsTaskAndCurrentTimeForManualRecord() {
         val app = ApplicationProvider.getApplicationContext<FocusTraceApplication>()
         val db = app.container.database
@@ -67,7 +79,8 @@ class FoundationTest {
             compose.onAllNodesWithText("统计").onFirst().performClick()
             compose.onNodeWithText("查看专注记录").performClick()
             compose.onNodeWithText("手动添加记录").performClick()
-            compose.onNodeWithText("日期（yyyy-MM-dd）").performTextReplacement("2024-06-12")
+            compose.onNodeWithText("选择或输入专注时长").assertExists()
+            compose.onNodeWithText("昨天").performClick()
             selectManualTime(14, 0)
             compose.onNodeWithText("专注时长（分钟）").performTextReplacement("5")
             compose.onNodeWithText("保存记录").assertIsNotEnabled()

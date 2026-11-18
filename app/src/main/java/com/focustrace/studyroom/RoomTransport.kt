@@ -57,6 +57,7 @@ internal class RoomHost(
     private val profile: RoomProfile,
     initial: RoomFocus,
     private val now: () -> Long,
+    private val roomKey: String = "",
     private val publish: (RoomRoster) -> Unit
 ) {
     private val members = linkedMapOf(HOST_ID to RoomMember(HOST_ID, profile, initial, now()))
@@ -85,7 +86,8 @@ internal class RoomHost(
                     currentCoroutineContext().ensureActive()
                     throw failure
                 }
-                if (!allow(socket)) { socket.closeQuietly(); continue }
+                socket.soTimeout = PEER_TIMEOUT_MS
+                val local = allow(socket)
                 if (connections.size >= ROOM_CAPACITY - 1) {
                     // Keep the number of closing or unauthenticated sockets bounded as well.
                     launch(Dispatchers.IO) {
@@ -95,7 +97,7 @@ internal class RoomHost(
                 }
                 val peer = RoomPeer(roomScope, socket, now, RoomWire.CLIENT_FRAME_LIMIT)
                 connections += peer
-                roomScope.launch { serve(peer) }
+                roomScope.launch { serve(peer, local) }
             }
         }
         val watchdog = launch {
@@ -117,10 +119,11 @@ internal class RoomHost(
         }
     }
 
-    private suspend fun serve(peer: RoomPeer) {
+    private suspend fun serve(peer: RoomPeer, local: Boolean) {
         var memberId: Int? = null
         try {
             val hello = peer.read() as? RoomMessage.Hello ?: throw IOException("无效的加入请求")
+            if (!(local && hello.key.isEmpty()) && (roomKey.isEmpty() || hello.key != roomKey)) throw IOException("邀请无效")
             val id = nextId++
             memberId = id
             peer.handshaken = true
@@ -131,7 +134,7 @@ internal class RoomHost(
             val snapshot = members.values.map {
                 it.copy(focus = it.focus.copy(seconds = it.focus.displaySeconds(it.receivedAt, snapshotAt)))
             }
-            peer.send(RoomMessage.Welcome(name, id, snapshot))
+            peer.send(RoomMessage.Welcome(name, id, snapshot, roomKey))
             broadcast(RoomMessage.Joined(member), except = id)
             emit()
             while (currentCoroutineContext().isActive) {
@@ -160,6 +163,7 @@ internal class RoomGuest(
     private val profile: RoomProfile,
     initial: RoomFocus,
     private val now: () -> Long,
+    private val roomKey: String = "",
     private val publish: (RoomRoster) -> Unit
 ) {
     private var focus = initial
@@ -178,7 +182,7 @@ internal class RoomGuest(
         }
     }
 
-    suspend fun run(socket: Socket, stop: Deferred<Unit>) = coroutineScope {
+    suspend fun run(socket: Socket, stop: Deferred<Unit>, onKey: (String) -> Unit = {}) = coroutineScope {
         val peer = RoomPeer(this, socket, now)
         connection = peer
         val stopMonitor = launch { stop.await(); peer.close() }
@@ -186,9 +190,11 @@ internal class RoomGuest(
             while (isActive) { delay(1_000); peer.expireIfNeeded() }
         }
         try {
-            peer.send(RoomMessage.Hello(profile, focus))
+            peer.send(RoomMessage.Hello(profile, focus, roomKey))
             when (val welcome = peer.read()) {
                 is RoomMessage.Welcome -> {
+                    if (roomKey.isNotEmpty() && welcome.key != roomKey) throw IOException("房间邀请已失效")
+                    onKey(welcome.key)
                     name = welcome.name
                     self = welcome.selfId
                     welcome.members.forEach { members[it.id] = it.copy(receivedAt = now()) }

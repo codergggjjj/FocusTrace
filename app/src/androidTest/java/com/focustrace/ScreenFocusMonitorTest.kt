@@ -19,6 +19,30 @@ import java.util.concurrent.CopyOnWriteArrayList
 
 @RunWith(AndroidJUnit4::class)
 class ScreenFocusMonitorTest {
+    @Test fun screenOffWinsOverStaleAwakePollAndNotificationResume() {
+        val app = ApplicationProvider.getApplicationContext<Context>()
+        lateinit var systemReceiver: BroadcastReceiver
+        val ctx = object : ContextWrapper(app) {
+            override fun registerReceiver(receiver: BroadcastReceiver?, filter: IntentFilter?): Intent? {
+                systemReceiver = requireNotNull(receiver)
+                return null
+            }
+        }
+        val states = mutableListOf<Pair<Boolean, Boolean>>()
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            val monitor = ScreenFocusMonitor(ctx) { foreground, exempt -> states.add(foreground to exempt) }
+            monitor.register()
+            monitor.onBackground()
+            assertEquals(false to false, states.last())
+            systemReceiver.onReceive(ctx, Intent(Intent.ACTION_SCREEN_OFF))
+            monitor.checkState()
+            monitor.syncAfterResume()
+            assertEquals(false to true, states.last())
+            systemReceiver.onReceive(ctx, Intent(Intent.ACTION_SCREEN_ON))
+            assertEquals(false to false, states.last())
+        }
+    }
+
     @Test fun screenOffOutsideAppIsDetectedEvenWhenScreenBroadcastIsMissing() {
         val app = ApplicationProvider.getApplicationContext<Context>()
         val instrumentation = InstrumentationRegistry.getInstrumentation()

@@ -3,8 +3,8 @@ package com.focustrace.studyroom
 import java.io.*
 
 internal sealed interface RoomMessage {
-    data class Hello(val profile: RoomProfile, val focus: RoomFocus) : RoomMessage
-    data class Welcome(val name: String, val selfId: Int, val members: List<RoomMember>) : RoomMessage
+    data class Hello(val profile: RoomProfile, val focus: RoomFocus, val key: String = "") : RoomMessage
+    data class Welcome(val name: String, val selfId: Int, val members: List<RoomMember>, val key: String = "") : RoomMessage
     data class Joined(val member: RoomMember) : RoomMessage
     data class Left(val id: Int) : RoomMessage
     data class Update(val id: Int, val focus: RoomFocus) : RoomMessage
@@ -13,7 +13,7 @@ internal sealed interface RoomMessage {
 }
 
 internal object RoomWire {
-    const val VERSION = 2
+    const val VERSION = 4
     const val CLIENT_FRAME_LIMIT = 36 * 1024
     private const val FRAME_LIMIT = 448 * 1024
 
@@ -22,10 +22,10 @@ internal object RoomWire {
         DataOutputStream(buffer).apply {
             writeByte(VERSION)
             when (message) {
-                is RoomMessage.Hello -> { writeByte(1); profile(message.profile); focus(message.focus) }
+                is RoomMessage.Hello -> { writeByte(1); profile(message.profile); focus(message.focus); writeUTF(message.key) }
                 is RoomMessage.Welcome -> {
                     writeByte(2); writeUTF(message.name); writeInt(message.selfId)
-                    writeByte(message.members.size); message.members.forEach { member(it) }
+                    writeByte(message.members.size); message.members.forEach { member(it) }; writeUTF(message.key)
                 }
                 is RoomMessage.Joined -> { writeByte(3); member(message.member) }
                 is RoomMessage.Left -> { writeByte(4); writeInt(message.id) }
@@ -47,7 +47,7 @@ internal object RoomWire {
         return with(packet) {
             if (readUnsignedByte() != VERSION) throw IOException("不兼容的自习室版本")
             val message = when (readUnsignedByte()) {
-                1 -> RoomMessage.Hello(profile(), focus())
+                1 -> RoomMessage.Hello(profile(), focus(), readUTF())
                 2 -> {
                     val name = text(63)
                     val self = id()
@@ -55,7 +55,7 @@ internal object RoomWire {
                     val members = List(count) { member() }
                     val ids = members.map(RoomMember::id).toSet()
                     if (self == HOST_ID || self !in ids || HOST_ID !in ids || ids.size != count) invalid()
-                    RoomMessage.Welcome(name, self, members)
+                    RoomMessage.Welcome(name, self, members, readUTF())
                 }
                 3 -> RoomMessage.Joined(member())
                 4 -> RoomMessage.Left(id())

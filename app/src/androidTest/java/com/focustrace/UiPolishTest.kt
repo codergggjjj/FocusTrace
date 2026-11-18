@@ -44,7 +44,7 @@ class UiPolishTest {
                 runBlocking { repo.update(original.copy(darkMode = mode)) }
                 compose.onAllNodesWithText("待办").onFirst().performClick()
                 compose.onNodeWithTag("todo-list").performScrollToIndex(0)
-                compose.onNodeWithText("今日概览").assertIsDisplayed()
+                compose.onNodeWithText("待办概览").assertIsDisplayed()
                 compose.onNodeWithText("2h 15m").assertIsDisplayed()
                 compose.onNodeWithTag("todo-filter-pending").assertIsSelected()
                 compose.onNodeWithContentDescription("创建待办").assertIsDisplayed()
