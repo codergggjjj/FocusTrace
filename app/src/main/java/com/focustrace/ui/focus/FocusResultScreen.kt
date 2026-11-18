@@ -21,12 +21,18 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun FocusResultScreen(viewModel: FocusResultViewModel, backLabel: String = "返回待办", onBack: () -> Unit) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val deleting by viewModel.deleting.collectAsStateWithLifecycle()
-    val deleteError by viewModel.deleteError.collectAsStateWithLifecycle()
+    val busy by viewModel.busy.collectAsStateWithLifecycle()
+    val actionError by viewModel.actionError.collectAsStateWithLifecycle()
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
-    (state as? LoadState.Ready)?.value?.session?.takeIf { confirmDelete }?.let { record ->
-        DeleteFocusRecordDialog(record, deleting, deleteError, onDismiss = { confirmDelete = false },
+    var editingDuration by rememberSaveable { mutableStateOf(false) }
+    val record = (state as? LoadState.Ready)?.value?.session
+    if (record != null && confirmDelete) {
+        DeleteFocusRecordDialog(record, busy, actionError, onDismiss = { confirmDelete = false },
             onConfirm = { viewModel.deleteRecord(onBack) })
+    }
+    if (record != null && editingDuration) {
+        EditFocusDurationDialog(record.focusSeconds, busy, actionError, onDismiss = { editingDuration = false },
+            onSave = { seconds -> viewModel.updateDuration(seconds) { editingDuration = false } })
     }
     BackHandler(onBack = onBack)
     Column(Modifier.fillMaxSize()) {
@@ -45,9 +51,9 @@ fun FocusResultScreen(viewModel: FocusResultViewModel, backLabel: String = "返�
                 when {
                     report == null -> Text("找不到这条专注记录。", Modifier.padding(24.dp))
                     !report.available -> Text("本轮尚未结束，结束后即可查看完整报告。", Modifier.padding(24.dp))
-                    else -> ReportContent(report, Modifier.weight(1f), deleting) {
-                        viewModel.clearDeleteError(); confirmDelete = true
-                    }
+                    else -> ReportContent(report, Modifier.weight(1f), busy,
+                        onEditDuration = { viewModel.clearActionError(); editingDuration = true },
+                        onDelete = { viewModel.clearActionError(); confirmDelete = true })
                 }
             }
         }
@@ -55,7 +61,8 @@ fun FocusResultScreen(viewModel: FocusResultViewModel, backLabel: String = "返�
 }
 
 @Composable
-private fun ReportContent(report: FocusReport, modifier: Modifier, deleting: Boolean, onDelete: () -> Unit) {
+private fun ReportContent(report: FocusReport, modifier: Modifier, busy: Boolean,
+    onEditDuration: () -> Unit, onDelete: () -> Unit) {
     val s = report.session
     var showDistractions by remember { mutableStateOf(false) }
     val formatter = remember { DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault()) }
@@ -75,6 +82,10 @@ private fun ReportContent(report: FocusReport, modifier: Modifier, deleting: Boo
                     if (s.type == 0) Text("计划 ${formatDuration(s.plannedSeconds)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer)
+                    if (s.source == "TIMER" && s.status == 4) {
+                        TextButton(onClick = onEditDuration, enabled = !busy,
+                            modifier = Modifier.testTag("report-edit-duration")) { Text("修改时长") }
+                    }
                 }
             }
         }
@@ -95,7 +106,7 @@ private fun ReportContent(report: FocusReport, modifier: Modifier, deleting: Boo
             }
         }
         item {
-            TextButton(onClick = onDelete, enabled = !deleting && s.status == 4,
+            TextButton(onClick = onDelete, enabled = !busy && s.status == 4,
                 modifier = Modifier.fillMaxWidth().testTag("report-delete-record"),
                 colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
                 Text(if (s.status == 3) "正在休息，结束后可删除" else "删除专注记录")

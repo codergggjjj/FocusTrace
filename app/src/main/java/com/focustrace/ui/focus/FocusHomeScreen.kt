@@ -32,7 +32,12 @@ import kotlinx.coroutines.delay
 import com.focustrace.statistics.isValidFocusSession
 
 @Composable
-fun FocusHomeScreen(viewModel: FocusViewModel, onExit: () -> Unit, onReport: (Long) -> Unit) {
+fun FocusHomeScreen(
+    viewModel: FocusViewModel,
+    onExit: () -> Unit,
+    backLabel: String = "返回待办",
+    onReport: (Long) -> Unit
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var showDistractions by rememberSaveable { mutableStateOf(false) }
     var showThreshold by rememberSaveable { mutableStateOf(false) }
@@ -60,7 +65,7 @@ fun FocusHomeScreen(viewModel: FocusViewModel, onExit: () -> Unit, onReport: (Lo
                     Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = null,
                         tint = if (immersive) Color.White else MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.width(8.dp))
-                    Text("返回待办", color = if (immersive) Color.White else MaterialTheme.colorScheme.primary)
+                    Text(backLabel, color = if (immersive) Color.White else MaterialTheme.colorScheme.primary)
                 }
                 state.lifecycleError?.let { Text(it, color = MaterialTheme.colorScheme.errorContainer) }
                 state.error?.let { Text(it, color = MaterialTheme.colorScheme.errorContainer) }
@@ -106,14 +111,14 @@ fun FocusHomeScreen(viewModel: FocusViewModel, onExit: () -> Unit, onReport: (Lo
             }
         }
     } else BasePage("计时", "") {
-        TextButton(onClick = onExit) { Text("返回待办") }
+        TextButton(onClick = onExit) { Text(backLabel) }
         state.lifecycleError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         if (!state.ready) CircularProgressIndicator()
         else if (s != null && s.endTime != null && isValidFocusSession(s)) {
             InfoCard("本轮已结束", "专注记录已保存")
             Button(onClick = { onReport(s.id) }) { Text("查看专注报告") }
-        } else Text("当前没有进行中的计时，请返回待办选择任务开始。")
+        } else Text("当前没有进行中的计时，可以返回后选择任务。")
     }
     if (showDistractions) DistractionHistoryDialog(state.distractions) { showDistractions = false }
     if (showThreshold) DistractionThresholdDialog(state.settings.distractionThreshold, onDismiss = { showThreshold = false },

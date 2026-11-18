@@ -6,6 +6,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -22,17 +25,30 @@ import com.focustrace.ui.todo.*
 import com.focustrace.ui.focus.*
 import com.focustrace.ui.statistics.*
 import com.focustrace.ui.settings.*
+import com.focustrace.ui.studyroom.StudyRoomScreen
+import com.focustrace.ui.studyroom.StudyRoomViewModel
+
+private const val ROOM_FOCUS_ROUTE = "focus/from-room"
 private enum class Tab(val route: String, val label: String, val icon: ImageVector) {
     TODO("todo", "待办", Icons.Outlined.CheckCircle),
     STATISTICS("statistics", "统计", Icons.Outlined.BarChart),
+    STUDY_ROOM("study-room", "自习室", Icons.Outlined.Groups),
     PROFILE("profile", "我的", Icons.Outlined.Person)
 }
 @Composable
 fun AppNavigation(container: AppContainer) {
     val controller = rememberNavController()
     val entry by controller.currentBackStackEntryAsState()
-    Scaffold(bottomBar = {
-        if (entry?.destination?.route !in listOf("report/{sessionId}", "focus", "task-study/{taskId}")) NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
+    val roomNotice by container.studyRoom.notice.collectAsStateWithLifecycle()
+    val snackbar = remember { SnackbarHostState() }
+    LaunchedEffect(roomNotice) {
+        roomNotice?.let {
+            snackbar.showSnackbar(it)
+            container.studyRoom.consumeNotice(it)
+        }
+    }
+    Scaffold(snackbarHost = { SnackbarHost(snackbar) }, bottomBar = {
+        if (entry?.destination?.route !in listOf("report/{sessionId}", "focus", ROOM_FOCUS_ROUTE, "task-study/{taskId}")) NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
             Tab.entries.forEach { tab ->
                 NavigationBarItem(colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = MaterialTheme.colorScheme.primary,
@@ -68,13 +84,21 @@ fun AppNavigation(container: AppContainer) {
                         controller.navigate("report/$id") { launchSingleTop = true }
                     }
                 }
+                composable(ROOM_FOCUS_ROUTE) {
+                    FocusHomeScreen(viewModel(factory = viewModelFactory { initializer { FocusViewModel(container) } }),
+                        onExit = { controller.popBackStack(Tab.STUDY_ROOM.route, false) }, backLabel = "返回自习室") { id ->
+                        controller.navigate("report/$id") { launchSingleTop = true }
+                    }
+                }
                 composable("report/{sessionId}", arguments = listOf(navArgument("sessionId") { type = NavType.LongType })) { reportEntry ->
                     val sessionId = reportEntry.arguments!!.getLong("sessionId")
                     val fromStatistics = controller.previousBackStackEntry?.destination?.route == Tab.STATISTICS.route
+                    val fromRoom = controller.previousBackStackEntry?.destination?.route == ROOM_FOCUS_ROUTE
                     val fromTaskStudy = controller.previousBackStackEntry?.destination?.route == "task-study/{taskId}"
                     FocusResultScreen(viewModel(factory = viewModelFactory { initializer { FocusResultViewModel(container.focusRepository, sessionId) } }),
-                        backLabel = if (fromStatistics) "返回统计" else if (fromTaskStudy) "返回学习详情" else "返回待办") {
-                        if (fromStatistics || fromTaskStudy) controller.popBackStack() else controller.popBackStack("todo", false)
+                        backLabel = if (fromStatistics) "返回统计" else if (fromTaskStudy) "返回学习详情" else if (fromRoom) "返回自习室" else "返回待办") {
+                        if (fromStatistics || fromTaskStudy) controller.popBackStack()
+                        else controller.popBackStack(if (fromRoom) Tab.STUDY_ROOM.route else Tab.TODO.route, false)
                     }
                 }
                 composable("task-study/{taskId}", arguments = listOf(navArgument("taskId") { type = NavType.LongType })) { studyEntry ->
@@ -87,6 +111,11 @@ fun AppNavigation(container: AppContainer) {
                 composable(Tab.STATISTICS.route) {
                     StatisticsScreen(viewModel(factory = viewModelFactory { initializer { StatisticsViewModel(container.statisticsRepository, container.focusRepository, container.taskRepository, container.settingsRepository, createSavedStateHandle()) } })) { id ->
                         controller.navigate("report/$id") { launchSingleTop = true }
+                    }
+                }
+                composable(Tab.STUDY_ROOM.route) {
+                    StudyRoomScreen(viewModel(factory = viewModelFactory { initializer { StudyRoomViewModel(container) } })) {
+                        controller.navigate(ROOM_FOCUS_ROUTE) { launchSingleTop = true }
                     }
                 }
                 composable(Tab.PROFILE.route) {

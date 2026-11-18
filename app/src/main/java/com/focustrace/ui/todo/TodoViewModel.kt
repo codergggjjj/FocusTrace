@@ -23,25 +23,10 @@ class TodoViewModel(private val container: com.focustrace.data.AppContainer) : V
         _busy.value = true
         viewModelScope.launch {
             try {
-                container.lifecycle.awaitEvents()
-                val current = container.pomodoro.refresh()
-                if (current?.status in listOf(1, 2, 3)) {
-                    if (current?.taskId == taskId) onStarted()
-                    else _error.value = "已有其他计时，请点击「返回计时」处理当前专注或休息。"
-                    return@launch
-                }
-                val task = repository.allTasks.first().firstOrNull { it.id == taskId }
-                if (task == null || task.completed) {
-                    _error.value = "待办已完成或已被删除，无法开始。"
-                    return@launch
-                }
-                val settings = container.settingsRepository.settings.first()
-                if (task.timerType == 1) container.pomodoro.startStopwatch(task.id)
-                else container.pomodoro.start(task.id, task.targetMinutes * 60L,
-                    settings.breakMinutes * 60L, settings.autoStartBreak, settings.autoStartFocus)
-                container.startTimerNotification()
+                container.focusStarter.open(taskId, returnAnyActive = false)
                 onStarted()
             } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (e: com.focustrace.focus.FocusStartException) { _error.value = e.message }
             catch (e: Exception) { _error.value = "无法开始专注，请重试；当前计时会保留。" }
             finally { _busy.value = false }
         }

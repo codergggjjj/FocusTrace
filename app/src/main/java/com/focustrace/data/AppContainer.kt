@@ -1,5 +1,10 @@
 package com.focustrace.data
 import android.content.Context
+import com.focustrace.statistics.*
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.delay
+import java.time.LocalDate
+import java.time.ZoneId
 import androidx.room.Room
 import com.focustrace.data.local.FocusTraceDatabase
 import com.focustrace.data.datastore.SettingsDataStore
@@ -22,5 +27,16 @@ class AppContainer(context: Context) {
     val focusAudioRepository = FocusAudioRepository(applicationContext)
     val focusAudioPlayer = com.focustrace.focus.FocusAudioPlayer(applicationContext, focusAudioRepository,
         database.focusSessionDao().observeLatest(), ::startTimerNotification)
+    internal val focusStarter = com.focustrace.focus.FocusStarter(this)
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    private val todayTotals = flow {
+        while (true) {
+            val zone = ZoneId.systemDefault()
+            emit(statisticsRange(LocalDate.now(zone), StatisticsPeriod.DAY, zone))
+            delay(60_000)
+        }
+    }.distinctUntilChanged().flatMapLatest(statisticsRepository::statistics).map { it.totals.focusSeconds }.distinctUntilChanged()
+    internal val studyRoom by lazy { com.focustrace.studyroom.StudyRoomController(
+        applicationContext, database.focusSessionDao().observeLatest(), todayTotals, clock, pomodoro::elapsedAt) }
     fun startTimerNotification() = com.focustrace.notification.FocusTimerService.start(applicationContext)
 }

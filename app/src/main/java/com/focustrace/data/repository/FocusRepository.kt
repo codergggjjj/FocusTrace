@@ -2,6 +2,7 @@ package com.focustrace.data.repository
 import com.focustrace.data.local.dao.FocusSessionDao
 import com.focustrace.data.local.dao.DistractionDao
 import com.focustrace.data.local.entity.*
+import com.focustrace.statistics.MIN_VALID_FOCUS_SECONDS
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
@@ -21,6 +22,10 @@ class FocusRepository(private val sessions: FocusSessionDao, private val distrac
     }
     suspend fun deleteManual(id: Long) {
         check(sessions.deleteManual(id) == 1) { "记录不存在或不是手动记录" }
+    }
+    suspend fun updateTimerDuration(id: Long, seconds: Long) {
+        require(seconds > MIN_VALID_FOCUS_SECONDS) { "专注时长必须超过 5 分钟" }
+        check(sessions.updateTimerDuration(id, seconds) == 1) { "记录不存在或不是已结束的计时记录" }
     }
     suspend fun deleteRecord(id: Long) {
         if (sessions.deleteFinished(id) == 0) {

@@ -25,7 +25,7 @@ class PomodoroEngine(private val db: FocusTraceDatabase, private val clock: Time
     private val dao = db.focusSessionDao()
     private var foreground = true
     fun elapsed(s: FocusSessionEntity): Long = elapsedAt(s, clock.snapshot())
-    private fun elapsedAt(s: FocusSessionEntity, at: TimerInstant): Long {
+    internal fun elapsedAt(s: FocusSessionEntity, at: TimerInstant): Long {
         if (s.backgroundWall != null) return s.elapsedMillis
         if (s.status !in listOf(1, 3)) return s.elapsedMillis
         val delta = if (s.bootCount >= 0 && s.bootCount == at.boot) at.elapsed - s.anchorElapsed

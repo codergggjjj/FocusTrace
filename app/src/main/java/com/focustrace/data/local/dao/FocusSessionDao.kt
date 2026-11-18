@@ -16,6 +16,9 @@ interface FocusSessionDao {
     suspend fun taskTitle(id: Long): String?
     @Query("UPDATE focus_sessions SET startTime = :start, endTime = :end, focusSeconds = :seconds, elapsedMillis = :millis, taskId = :taskId, taskTitleSnapshot = :title, note = :note WHERE id = :id AND source = 'MANUAL' AND status = 4")
     suspend fun updateManual(id: Long, start: Long, end: Long, seconds: Long, millis: Long, taskId: Long?, title: String?, note: String?): Int
+    // Keep the recorded timer interval and distraction history intact.
+    @Query("UPDATE focus_sessions SET focusSeconds = :seconds WHERE id = :id AND source = 'TIMER' AND status = 4 AND endTime IS NOT NULL")
+    suspend fun updateTimerDuration(id: Long, seconds: Long): Int
     @Query("DELETE FROM focus_sessions WHERE id = :id AND source = 'MANUAL' AND status = 4")
     suspend fun deleteManual(id: Long): Int
     // Guard and delete in one statement, so a live timer cannot be removed by a stale UI.
