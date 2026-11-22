@@ -109,7 +109,7 @@ fun ProfileScreen(viewModel: SettingsViewModel, musicViewModel: MusicLibraryView
             }
             if (musicViewModel != null) Column {
                 SettingsSection("声音")
-                SettingRow(Icons.Outlined.MusicNote, "专注音乐", "批量导入 · 列表循环", true) { editingMusic = true }
+                SettingRow(Icons.Outlined.MusicNote, "专注音乐", "本地导入 · 音乐平台", true) { editingMusic = true }
             }
             Column {
                 SettingsSection("数据")

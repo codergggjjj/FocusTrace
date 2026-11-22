@@ -1,6 +1,9 @@
 package com.focustrace.ui.settings
 
 import android.net.Uri
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.focustrace.data.repository.FocusAudioRepository
@@ -10,6 +13,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
 class MusicLibraryViewModel(private val repository: FocusAudioRepository, private val player: FocusAudioPlayer) : ViewModel() {
+    internal var scanSelection by mutableStateOf(emptySet<Uri>())
     private val importing = MutableStateFlow(false)
     private val message = MutableStateFlow<String?>(null)
     val uiState = combine(repository.library, player.state, importing, message) { library, playback, busy, text ->
@@ -23,15 +27,16 @@ class MusicLibraryViewModel(private val repository: FocusAudioRepository, privat
         importing.value = true
         viewModelScope.launch {
             var imported = 0
+            var skipped = uris.size - uniqueUris.size
             var failed = 0
             try {
                 for ((index, uri) in uniqueUris.withIndex()) {
                     message.value = "正在导入 ${index + 1} / ${uniqueUris.size}"
-                    try { repository.importAudio(uri); imported++ }
+                    try { if (repository.importUnique(uri).second) imported++ else skipped++ }
                     catch (error: CancellationException) { throw error }
                     catch (error: Exception) { failed++ }
                 }
-                message.value = if (failed == 0) "已导入 $imported 首" else "已导入 $imported 首，$failed 首失败，请检查格式、大小或可用空间"
+                message.value = "已导入 $imported 首，$failed 首失败，跳过重复 $skipped 首"
             } finally { importing.value = false }
         }
     }

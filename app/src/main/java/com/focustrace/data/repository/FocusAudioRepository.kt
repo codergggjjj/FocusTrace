@@ -11,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -24,7 +25,7 @@ import kotlin.coroutines.coroutineContext
 
 private val Context.focusAudioStore by preferencesDataStore(name = "focus_audio")
 
-data class FocusAudioTrack(val id: String, val title: String, val durationSeconds: Long)
+data class FocusAudioTrack(val id: String, val title: String, val durationSeconds: Long, val sourceUri: String? = null)
 data class FocusAudioLibrary(val tracks: List<FocusAudioTrack> = emptyList(), val selectedId: String? = null) {
     val selected: FocusAudioTrack? get() = tracks.firstOrNull { it.id == selectedId }
 }
@@ -41,8 +42,17 @@ class FocusAudioRepository(context: Context) {
         FocusAudioLibrary(decode(preferences[tracksKey]), preferences[selectedKey])
     }
 
-    suspend fun importAudio(uri: Uri): FocusAudioTrack = withContext(Dispatchers.IO) {
+    suspend fun importAudio(uri: Uri): FocusAudioTrack = importUnique(uri).first
+
+    suspend fun importUnique(uri: Uri): Pair<FocusAudioTrack, Boolean> = withContext(Dispatchers.IO) {
         lock.withLock {
+            val documentId = uri.lastPathSegment.orEmpty()
+            val mediaId = documentId.removePrefix("audio:").toLongOrNull()
+            val sourceUri = if (uri.authority == "com.android.providers.media.documents" &&
+                documentId.startsWith("audio:") && mediaId != null) {
+                android.content.ContentUris.withAppendedId(android.provider.MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, mediaId).toString()
+            } else uri.normalizeScheme().toString()
+            library.first().tracks.firstOrNull { it.sourceUri == sourceUri }?.let { return@withLock it to false }
             val title = if (uri.scheme == "content") {
                 context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
                     if (it.moveToFirst()) it.getString(0) else null
@@ -78,7 +88,7 @@ class FocusAudioRepository(context: Context) {
                     require(millis > 0) { "音频格式不受支持或文件已损坏" }
                     (millis + 999) / 1000
                 } finally { retriever.release() }
-                val track = FocusAudioTrack(id, title?.take(200)?.takeIf { it.isNotBlank() } ?: "未命名音频", duration)
+                val track = FocusAudioTrack(id, title?.take(200)?.takeIf { it.isNotBlank() } ?: "未命名音频", duration, sourceUri)
                 // Commit the library entry as one step; cancellation after the file is copied
                 // must not leave a persisted entry pointing at a deleted file.
                 withContext(NonCancellable) {
@@ -87,7 +97,7 @@ class FocusAudioRepository(context: Context) {
                         preferences[selectedKey] = id
                     }
                 }
-                track
+                track to true
             } catch (error: Exception) {
                 // Only this import's explicitly owned file is removed; no directory cleanup.
                 file.delete()
@@ -145,12 +155,12 @@ class FocusAudioRepository(context: Context) {
         val array = JSONArray(value ?: "[]")
         return List(array.length()) { index ->
             val row = array.getJSONObject(index)
-            FocusAudioTrack(row.getString("id"), row.getString("title"), row.getLong("seconds"))
+            FocusAudioTrack(row.getString("id"), row.getString("title"), row.getLong("seconds"), row.optString("source").ifEmpty { null })
         }
     }
 
     private fun encode(tracks: List<FocusAudioTrack>): String = JSONArray().apply {
-        tracks.forEach { track -> put(JSONObject().put("id", track.id).put("title", track.title).put("seconds", track.durationSeconds)) }
+        tracks.forEach { track -> put(JSONObject().put("id", track.id).put("title", track.title).put("seconds", track.durationSeconds).put("source", track.sourceUri)) }
     }.toString()
 
     companion object { private const val MAX_AUDIO_BYTES = 100L * 1024 * 1024 }

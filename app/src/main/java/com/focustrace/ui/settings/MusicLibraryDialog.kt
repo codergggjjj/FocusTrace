@@ -25,14 +25,25 @@ internal fun MusicLibraryDialog(viewModel: MusicLibraryViewModel, onDismiss: () 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         viewModel.importAudio(uris)
     }
+    var scanning by rememberSaveable { mutableStateOf(false) }
+    if (scanning) {
+        DeviceMusicDialog(viewModel, onFiles = {
+            scanning = false
+            picker.launch(arrayOf("audio/*"))
+        }, onClose = { scanning = false })
+        return
+    }
     AlertDialog(onDismissRequest = onDismiss, title = { Text("专注音乐") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("支持多选，单首最多 100 MB。按列表顺序循环，选中项作为起始曲目。", style = MaterialTheme.typography.bodySmall)
-                if (state.importing) LinearProgressIndicator(Modifier.fillMaxWidth())
-                (state.message ?: state.playback.error)?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-                if (state.library.tracks.isEmpty()) Text("还没有导入音乐", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                else LazyColumn(Modifier.fillMaxWidth().heightIn(max = 300.dp)) {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                item { ExternalMusicSettings() }
+                item {
+                    Text("支持多选，单首最多 100 MB。按列表顺序循环，选中项作为起始曲目。", style = MaterialTheme.typography.bodySmall)
+                    if (state.importing) LinearProgressIndicator(Modifier.fillMaxWidth())
+                    (state.message ?: state.playback.error)?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                }
+                if (state.library.tracks.isEmpty()) item { Text("还没有导入音乐", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                else {
                     items(state.library.tracks, key = { it.id }) { track ->
                         AudioTrackRow(track, track.id == state.library.selectedId,
                             onSelect = { viewModel.selectAudio(track.id) },
@@ -41,7 +52,7 @@ internal fun MusicLibraryDialog(viewModel: MusicLibraryViewModel, onDismiss: () 
                 }
             }
         }, confirmButton = {
-            TextButton(onClick = { picker.launch(arrayOf("audio/*")) }, enabled = !state.importing,
+            TextButton(onClick = { viewModel.scanSelection = emptySet(); scanning = true }, enabled = !state.importing,
                 modifier = Modifier.testTag("focus-audio-import")) {
                 Icon(Icons.Outlined.Add, contentDescription = null)
                 Spacer(Modifier.width(4.dp))

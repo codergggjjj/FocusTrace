@@ -1,5 +1,6 @@
 package com.focustrace.ui.todo
 
+import com.focustrace.focus.FocusStatus
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -115,7 +116,7 @@ fun TodoScreen(viewModel: TodoViewModel, onReport: (Long) -> Unit, onStudy: (Lon
                     }
                     items(visibleTasks, key = { it.id }, contentType = { "task" }) { task ->
                         TaskCard(task = task, todaySessions = data.todayTaskSessions[task.id] ?: 0,
-                            active = data.activeSession?.taskId == task.id, busy = busy,
+                            sessionStatus = data.activeSession?.takeIf { it.taskId == task.id }?.status, busy = busy,
                             onEdit = onEditTask, onToggle = onToggleTask, onStart = onStartTask)
                     }
                 }
@@ -244,8 +245,14 @@ private fun TodoEmptyState(filter: TodoFilter, noTasks: Boolean, onAdd: () -> Un
 
 /** Stable callbacks and lazy keys preserve skipping for unchanged task rows. */
 @Composable
-private fun TaskCard(task: TaskEntity, todaySessions: Int, active: Boolean, busy: Boolean,
+private fun TaskCard(task: TaskEntity, todaySessions: Int, sessionStatus: Int?, busy: Boolean,
     onEdit: (Long) -> Unit, onToggle: (TaskEntity) -> Unit, onStart: (Long) -> Unit) {
+    val statusLabel = when (sessionStatus) {
+        FocusStatus.FOCUSING.code -> "专注中"
+        FocusStatus.PAUSED.code -> "已暂停"
+        FocusStatus.RESTING.code -> "休息中"
+        else -> null
+    }
     Card(Modifier.fillMaxWidth().clickable(enabled = !busy, onClickLabel = "编辑待办") { onEdit(task.id) },
         shape = RoundedCornerShape(TodoCardRadius),
         colors = CardDefaults.cardColors(containerColor = if (task.completed)
@@ -267,18 +274,18 @@ private fun TaskCard(task: TaskEntity, todaySessions: Int, active: Boolean, busy
                 val mode = if (task.timerType == 1) "正向计时" else "番茄钟 · ${task.targetMinutes} 分钟"
                 val progress = when {
                     task.completed -> "已完成"
-                    active -> "进行中"
+                    statusLabel != null -> statusLabel
                     todaySessions > 0 -> "今日专注 $todaySessions 次"
                     else -> "尚未开始"
                 }
-                Text("$mode · $progress", style = MaterialTheme.typography.bodySmall,
-                    color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                Text(if (statusLabel != null && !task.completed) "$progress · $mode" else "$mode · $progress", style = MaterialTheme.typography.bodySmall,
+                    color = if (statusLabel != null && !task.completed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             if (!task.completed) {
-                if (active) FilledTonalIconButton(onClick = { onStart(task.id) }, enabled = !busy,
+                if (statusLabel != null) FilledTonalIconButton(onClick = { onStart(task.id) }, enabled = !busy,
                     modifier = Modifier.size(44.dp).testTag("start-task-${task.id}")) {
-                    Icon(Icons.Outlined.Timer, contentDescription = "返回专注：${task.title}")
+                    Icon(Icons.Outlined.Timer, contentDescription = "返回计时：${task.title}，$statusLabel")
                 } else FilledIconButton(onClick = { onStart(task.id) }, enabled = !busy,
                     modifier = Modifier.size(44.dp).testTag("start-task-${task.id}")) {
                     Icon(Icons.Outlined.PlayArrow, contentDescription = "开始专注：${task.title}")

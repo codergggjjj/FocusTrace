@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.focustrace.data.AppContainer
 import com.focustrace.data.datastore.UserSettings
 import com.focustrace.data.local.entity.*
+import com.focustrace.focus.MusicSource
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
@@ -23,9 +24,25 @@ class FocusViewModel(private val container: AppContainer) : ViewModel() {
         FocusAudioUiState(library, playback)
     }.catch { emit(FocusAudioUiState(message = "无法读取音乐列表，请重试")) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), FocusAudioUiState())
-    fun toggleAudio() = container.focusAudioPlayer.toggle()
-    fun previousAudio() = container.focusAudioPlayer.previous()
-    fun nextAudio() = container.focusAudioPlayer.next()
+    private val externalMusic = container.externalMusic
+    val externalAudioState = externalMusic.state
+
+    fun refreshExternalAudio() = externalMusic.refresh()
+
+    fun toggleAudio() {
+        if (externalAudioState.value.source == MusicSource.LOCAL) container.focusAudioPlayer.toggle()
+        else externalMusic.toggle()
+    }
+
+    fun previousAudio() {
+        if (externalAudioState.value.source == MusicSource.LOCAL) container.focusAudioPlayer.previous()
+        else externalMusic.previous()
+    }
+
+    fun nextAudio() {
+        if (externalAudioState.value.source == MusicSource.LOCAL) container.focusAudioPlayer.next()
+        else externalMusic.next()
+    }
     init {
         viewModelScope.launch {
             uiState.map { state ->

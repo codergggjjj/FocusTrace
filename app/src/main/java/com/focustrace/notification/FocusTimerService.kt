@@ -31,7 +31,8 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
+import com.focustrace.focus.MusicSource
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -52,7 +53,10 @@ class FocusTimerService : Service() {
         startAsForeground(placeholderNotification())
         loop = scope.launch { monitorTimer() }
         scope.launch {
-            container.focusAudioPlayer.state.map { Triple(it.track?.id, it.playing, it.preparing) }
+            combine(container.focusAudioPlayer.state, container.externalMusic.state) { local, external ->
+                if (external.source == MusicSource.LOCAL) Triple(local.track != null, local.playing, local.preparing)
+                else Triple(external.canToggle, external.playing, false)
+            }
                 .distinctUntilChanged().collect {
                     lastSession?.takeIf { session -> session.status in ACTIVE_STATUSES }?.let { session ->
                         startAsForeground(ongoingNotification(session))
@@ -81,7 +85,8 @@ class FocusTimerService : Service() {
                 container.pomodoro.finish()
                 stopTimerService()
             }
-            ACTION_AUDIO_TOGGLE -> container.focusAudioPlayer.toggle()
+            ACTION_AUDIO_TOGGLE -> if (container.externalMusic.state.value.source == MusicSource.LOCAL)
+                container.focusAudioPlayer.toggle() else container.externalMusic.toggle()
             ACTION_SYNC, null -> Unit
         }
         return START_STICKY
@@ -92,6 +97,7 @@ class FocusTimerService : Service() {
     override fun onDestroy() {
         loop?.cancel()
         scope.cancel()
+        container.externalMusic.release()
         container.focusAudioPlayer.stop()
         super.onDestroy()
     }
@@ -217,9 +223,13 @@ class FocusTimerService : Service() {
         }
         builder.addAction(R.drawable.ic_notification_stop, if (session.status == 3) "结束休息" else "结束", serviceIntent(ACTION_FINISH, 3))
         val music = container.focusAudioPlayer.state.value
-        if (session.status == 1 && music.track != null) {
-            builder.addAction(if (music.foregroundActive) R.drawable.ic_notification_pause else R.drawable.ic_notification_play,
-                if (music.foregroundActive) "暂停音乐" else "播放音乐", serviceIntent(ACTION_AUDIO_TOGGLE, 4))
+        val external = container.externalMusic.state.value
+        val local = external.source == MusicSource.LOCAL
+        val available = if (local) music.track != null else external.canToggle
+        val playing = if (local) music.foregroundActive else external.playing
+        if (session.status == 1 && available) {
+            builder.addAction(if (playing) R.drawable.ic_notification_pause else R.drawable.ic_notification_play,
+                if (playing) "暂停音乐" else "播放音乐", serviceIntent(ACTION_AUDIO_TOGGLE, 4))
         }
         return builder.build()
     }

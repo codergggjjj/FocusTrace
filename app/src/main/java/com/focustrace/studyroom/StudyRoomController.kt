@@ -28,7 +28,7 @@ internal class StudyRoomController(
 ) {
     private sealed interface Destination {
         data class Host(val name: String) : Destination
-        data class Guest(val listing: RoomListing? = null, val invite: RoomInvite? = null, val returning: Boolean = false) : Destination
+        data class Guest(val listing: RoomListing? = null, val invite: RoomInvite? = null, val returning: Boolean = false, val offer: String? = null) : Destination
     }
     private class Request(val destination: Destination) {
         val stop = CompletableDeferred<Unit>()
@@ -41,6 +41,36 @@ internal class StudyRoomController(
     private val saved = context.getSharedPreferences("study_room_resume", Context.MODE_PRIVATE)
     val savedName = MutableStateFlow(saved.getString("name", null))
     val lastInvite = MutableStateFlow(saved.getString("guest", null))
+    private val activeRtc = MutableStateFlow<RoomRtc?>(null)
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val rtcSignal = activeRtc.flatMapLatest { it?.signal ?: flowOf("") }
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val rtcStatus = activeRtc.flatMapLatest { it?.status ?: flowOf("") }
+    fun startRtc() {
+        val link = RoomInvite.parse(invitation.value.orEmpty()) ?: return
+        if (activeRtc.value != null) return
+        activeRtc.value = RoomRtc(context, link, null, {}, ::rtcFailed)
+    }
+    fun stopRtc() { activeRtc.value?.close(); activeRtc.value = null }
+    private fun rtcFailed() {
+        stopRtc()
+        mutableNotice.value = "穿透连接未建立或已断开，请检查网络后重新邀请"
+    }
+    fun acceptSignal(text: String) {
+        try {
+            require(text.length <= 65536)
+            val data = org.json.JSONObject(text)
+            val link = requireNotNull(RoomInvite.parse(data.getString("invite")))
+            val sdp = data.getString("sdp")
+            require(sdp.length in 1..48000 && sdp.startsWith("v=0") && sdp.contains("m=application") &&
+                sdp.lineSequence().none { it.startsWith("m=") && !it.startsWith("m=application ") })
+            when (data.getString("type")) {
+                "offer" -> { require(state.value == StudyRoomState.Lobby); begin(Destination.Guest(invite = link, offer = sdp)) }
+                "answer" -> { val rtc = requireNotNull(activeRtc.value); require(invitation.value == link.text && rtc.invite == link); rtc.answer(sdp) }
+                else -> error("type")
+            }
+        } catch (_: Exception) { mutableNotice.value = "穿透邀请或答复无效，请重新复制完整内容" }
+    }
     val invitation = MutableStateFlow<String?>(null)
     fun restoreHost() { savedName.value?.let(::create) }
     fun joinInvite(value: String) {
@@ -149,6 +179,7 @@ internal class StudyRoomController(
         } finally {
             req.abort()
             if (request === req) {
+                stopRtc()
                 invitation.value = null
                 stopService()
                 request = null
@@ -226,7 +257,20 @@ internal class StudyRoomController(
                             throw error
                         }
                     }
-                    val (target, socket) = openRoomEndpoint(original, destination.returning,
+                    val (target, socket) = if (destination.offer != null && invite != null) {
+                        val connected = CompletableDeferred<java.net.Socket>()
+                        val rtc = RoomRtc(context, invite, destination.offer, { connected.complete(it) }, {
+                            connected.completeExceptionally(IOException("穿透失败，请重新邀请")); rtcFailed()
+                        })
+                        activeRtc.value = rtc
+                        req.abort = { rtc.close(); connected.cancel() }
+                        val raw = connected.await()
+                        val secure = withContext(Dispatchers.IO) {
+                            raw.soTimeout = 5000
+                            RoomTls.client(raw, invite.host, invite.port, invite.pin).apply { soTimeout = PEER_TIMEOUT_MS }
+                        }
+                        original to secure
+                    } else openRoomEndpoint(original, destination.returning,
                         discover = { pin -> lan.rediscover(pin, wifi) }, open = ::open)
                     req.abort = socket::closeQuietly
                     val guest = RoomGuest(identity, initial, clock::elapsed, invite?.key.orEmpty(), ::joined)

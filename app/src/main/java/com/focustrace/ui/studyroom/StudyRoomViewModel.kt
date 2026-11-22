@@ -34,6 +34,11 @@ internal class StudyRoomViewModel(private val container: AppContainer) : ViewMod
     fun join(listing: RoomListing) = room.join(listing)
     val savedRoom = room.savedName
     val lastInvite = room.lastInvite
+    val rtcSignal = room.rtcSignal
+    val rtcStatus = room.rtcStatus
+    fun startRtc() = room.startRtc()
+    fun stopRtc() = room.stopRtc()
+    fun acceptSignal(text: String) = room.acceptSignal(text)
     val invitation = room.invitation
     fun joinInvite(text: String) = room.joinInvite(text)
     fun returnToRoom() = room.returnToRoom()

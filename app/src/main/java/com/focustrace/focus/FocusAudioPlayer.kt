@@ -87,7 +87,10 @@ class FocusAudioPlayer(
         }
     }
 
+    internal var localSelected: () -> Boolean = { true }
+
     fun toggle() {
+        if (!localSelected()) return
         if (state.value.switching) return
         if (state.value.foregroundActive) pause() else play()
     }
@@ -97,7 +100,7 @@ class FocusAudioPlayer(
     fun next() = skip(1)
 
     private fun skip(direction: Int) {
-        if (sessionStatus != 1 || tracks.size < 2 || state.value.switching) return
+        if (!localSelected() || sessionStatus != 1 || tracks.size < 2 || state.value.switching) return
         val index = tracks.indexOfFirst { it.id == state.value.track?.id }
         if (index < 0) return
         val next = tracks[(index + direction + tracks.size) % tracks.size]
@@ -122,6 +125,7 @@ class FocusAudioPlayer(
     }
 
     fun play() {
+        if (!localSelected()) return
         if (state.value.switching) return
         if (sessionStatus != 1) {
             mutableState.update { it.copy(error = "请先继续专注，再播放音乐") }

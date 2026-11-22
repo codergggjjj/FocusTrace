@@ -70,6 +70,15 @@ internal fun StudyRoomScreen(viewModel: StudyRoomViewModel, onFocus: () -> Unit)
     var picking by rememberSaveable { mutableStateOf(false) }
     var joinKey by rememberSaveable { mutableStateOf<String?>(null) }
     val context = androidx.compose.ui.platform.LocalContext.current
+    val rtcStatus by viewModel.rtcStatus.collectAsStateWithLifecycle(initialValue = "")
+    val rtcSignal by viewModel.rtcSignal.collectAsStateWithLifecycle(initialValue = "")
+    var natDialog by rememberSaveable { mutableStateOf(false) }
+    var signalInput by remember { mutableStateOf("") }
+    fun shareSignal() {
+        val share = android.content.Intent(android.content.Intent.ACTION_SEND)
+            .setType("text/plain").putExtra(android.content.Intent.EXTRA_TEXT, rtcSignal)
+        context.startActivity(android.content.Intent.createChooser(share, "分享穿透连接信息"))
+    }
     val savedRoom by viewModel.savedRoom.collectAsStateWithLifecycle()
     val lastInvite by viewModel.lastInvite.collectAsStateWithLifecycle()
     val invitation by viewModel.invitation.collectAsStateWithLifecycle()
@@ -133,6 +142,7 @@ internal fun StudyRoomScreen(viewModel: StudyRoomViewModel, onFocus: () -> Unit)
                         }
                     }
                     item {
+                        TextButton(onClick = { signalInput = ""; natDialog = true }) { Text("通过 NAT 穿透加入") }
                         Text("附近的自习室", style = MaterialTheme.typography.titleMedium)
                         val started = remember(discovery.startedAt) { discovery.startedAt?.let {
                             Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).format(RoomSearchTime)
@@ -164,6 +174,8 @@ internal fun StudyRoomScreen(viewModel: StudyRoomViewModel, onFocus: () -> Unit)
             Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(if (room.hosting) "正在创建自习室…" else "正在加入自习室…", style = MaterialTheme.typography.titleLarge)
+                if (rtcStatus.isNotEmpty()) Text(rtcStatus)
+                if (rtcSignal.isNotEmpty()) Button(onClick = ::shareSignal) { Text("分享连接答复给房主") }
                 LinearProgressIndicator(Modifier.fillMaxWidth())
                 TextButton(onClick = viewModel::leave) { Text("取消") }
             }
@@ -190,6 +202,9 @@ internal fun StudyRoomScreen(viewModel: StudyRoomViewModel, onFocus: () -> Unit)
                             Text(if (roster.isHost) "关闭自习室" else "离开自习室")
                         }
                     }
+                    if (roster.isHost) TextButton(onClick = { signalInput = ""; natDialog = true }) {
+                        Text(if (rtcStatus.isEmpty()) "NAT 穿透邀请" else rtcStatus)
+                    }
                     Text("今日专注排行", Modifier.padding(start = 16.dp, end = 16.dp, bottom = 10.dp), style = MaterialTheme.typography.titleMedium)
                 }
                 items(displayMembers, key = { it.id }) { member ->
@@ -206,6 +221,23 @@ internal fun StudyRoomScreen(viewModel: StudyRoomViewModel, onFocus: () -> Unit)
         }
     }
 
+    if (natDialog) {
+        val hosting = (state as? StudyRoomState.Joined)?.roster?.isHost == true
+        AlertDialog(onDismissRequest = { natDialog = false }, title = { Text("NAT 穿透") }, text = {
+            Column {
+                Text("使用 Cloudflare STUN 探测地址，双方通过分享交换连接信息。需要 Wi-Fi，校园网可能限制直连。")
+                if (rtcStatus.isNotEmpty()) Text(rtcStatus)
+                if (hosting && rtcSignal.isNotEmpty()) TextButton(onClick = ::shareSignal) { Text("分享穿透邀请") }
+                if (!hosting || rtcSignal.isNotEmpty()) OutlinedTextField(signalInput, { signalInput = it.take(65536) },
+                    label = { Text(if (hosting) "粘贴对方的连接答复" else "粘贴房主的穿透邀请") }, maxLines = 3)
+                if (hosting && rtcStatus.isNotEmpty()) TextButton(onClick = { viewModel.stopRtc(); natDialog = false }) { Text("关闭穿透通道") }
+            }
+        }, confirmButton = { TextButton(enabled = (hosting && rtcStatus.isEmpty()) || signalInput.isNotBlank(), onClick = {
+            if (hosting && rtcStatus.isEmpty()) viewModel.startRtc()
+            else { viewModel.acceptSignal(signalInput); signalInput = ""; natDialog = false }
+        }) { Text(if (hosting && rtcStatus.isEmpty()) "生成穿透邀请" else "连接") } },
+            dismissButton = { TextButton(onClick = { natDialog = false }) { Text("关闭") } })
+    }
     if (forgetGuest && lobby) AlertDialog(onDismissRequest = { forgetGuest = false },
         title = { Text("忘记上次加入的房间？") }, text = { Text("只移除本机保存的邀请，以后仍可通过新邀请加入。") },
         confirmButton = { TextButton(onClick = { viewModel.forgetGuest(); forgetGuest = false }) { Text("忘记") } },

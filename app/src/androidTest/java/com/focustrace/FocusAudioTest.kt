@@ -26,6 +26,10 @@ class FocusAudioTest {
         val invalid = File.createTempFile("audio_invalid_", ".txt", app.cacheDir).apply { writeText("not audio") }
         val track = repository.importAudio(Uri.fromFile(source))
         try {
+            val repeated = FocusAudioRepository(app).importUnique(Uri.fromFile(source))
+            assertEquals(track.id, repeated.first.id)
+            assertFalse(repeated.second)
+            assertEquals(previous.tracks.size + 1, repository.library.first().tracks.size)
             assertTrue(source.delete())
             repository.open(track).use { assertTrue(it.statSize > 44) }
             val recreated = FocusAudioRepository(app).library.first()
@@ -186,11 +190,11 @@ class FocusAudioTest {
         val container = app.container
         val repository = container.focusAudioRepository
         val previous = repository.library.first()
-        val source = makeWave(30)
+        val sources = listOf(makeWave(30), makeWave(30))
         val added = mutableListOf<com.focustrace.data.repository.FocusAudioTrack>()
         val audio = container.focusAudioPlayer
         try {
-            repeat(2) { added += repository.importAudio(Uri.fromFile(source)) }
+            sources.forEach { added += repository.importAudio(Uri.fromFile(it)) }
             repository.select(added.first().id)
             container.lifecycle.awaitEvents()
             container.pomodoro.finish()
@@ -218,8 +222,21 @@ class FocusAudioTest {
             app.stopService(Intent(app, FocusTimerService::class.java))
             added.forEach { repository.remove(it.id) }
             previous.selectedId?.let { repository.select(it) }
-            source.delete()
+            sources.forEach { it.delete() }
         }
+    }
+
+    @Test fun selectingFilteredResultsPreservesHiddenSelections() {
+        val one = Uri.parse("content://media/1")
+        val two = Uri.parse("content://media/2")
+        val existing = Uri.parse("content://media/3")
+        val visible = listOf(com.focustrace.ui.settings.DeviceSong(two, "second.wav", "Music", ""),
+            com.focustrace.ui.settings.DeviceSong(existing, "existing.wav", "Music", ""))
+        val choices = com.focustrace.ui.settings.selectableSongs(visible, setOf(existing))
+        assertEquals(setOf(two), choices)
+        val all = com.focustrace.ui.settings.selectVisibleSongs(setOf(one), choices)
+        assertEquals(setOf(one, two), all)
+        assertEquals(setOf(one), com.focustrace.ui.settings.selectVisibleSongs(all, choices))
     }
 
     private fun makeWave(seconds: Int = 10): File {

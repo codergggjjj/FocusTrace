@@ -27,6 +27,11 @@ class AppContainer(context: Context) {
     val focusAudioRepository = FocusAudioRepository(applicationContext)
     val focusAudioPlayer = com.focustrace.focus.FocusAudioPlayer(applicationContext, focusAudioRepository,
         database.focusSessionDao().observeLatest(), ::startTimerNotification)
+    val externalMusic = com.focustrace.focus.ExternalMusicController(applicationContext,
+        database.focusSessionDao().observeLatest(), focusAudioPlayer::stop)
+    init {
+        focusAudioPlayer.localSelected = { externalMusic.state.value.source == com.focustrace.focus.MusicSource.LOCAL }
+    }
     internal val focusStarter = com.focustrace.focus.FocusStarter(this)
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     private val todayTotals = flow {

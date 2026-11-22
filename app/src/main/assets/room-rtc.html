@@ -1,0 +1,36 @@
+<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'"><script>
+let pc, ch, sending = false;
+function fail(){ Bridge.failed(); }
+function channel(c){
+  ch=c; c.binaryType='arraybuffer';
+  c.onopen=()=>Bridge.opened();
+  c.onclose=fail; c.onerror=fail;
+  c.onmessage=e=>{
+    if (!(e.data instanceof ArrayBuffer) || e.data.byteLength>16384) return fail();
+    Bridge.received(btoa(String.fromCharCode(...new Uint8Array(e.data))));
+  };
+}
+async function start(remote){
+ try {
+  pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.cloudflare.com:3478'}]});
+  pc.onconnectionstatechange=()=>{if(pc.connectionState==='failed')fail()};
+  pc.onicecandidate=e=>{if(!e.candidate)Bridge.signal(pc.localDescription.sdp)};
+  if(remote===null){
+    channel(pc.createDataChannel('room',{ordered:true}));
+    await pc.setLocalDescription(await pc.createOffer());
+  } else {
+    pc.ondatachannel=e=>channel(e.channel);
+    await pc.setRemoteDescription({type:'offer',sdp:remote});
+    await pc.setLocalDescription(await pc.createAnswer());
+  }
+ }catch(e){fail()}
+}
+async function answer(sdp){try{await pc.setRemoteDescription({type:'answer',sdp})}catch(e){fail()}}
+function send(data){
+ if (!ch || ch.readyState!=='open')return fail();
+ try {ch.send(Uint8Array.from(atob(data),c=>c.charCodeAt(0)));
+   if(ch.bufferedAmount<65536)Bridge.sent();
+   else {ch.bufferedAmountLowThreshold=32768;ch.onbufferedamountlow=()=>{ch.onbufferedamountlow=null;Bridge.sent()}}
+ }catch(e){fail()}
+}
+</script>
